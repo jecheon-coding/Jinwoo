@@ -320,6 +320,17 @@ export default function ReportPage({
           청구금액 : <span className="inv-amount">₩ {Math.round(totalAmt).toLocaleString()}</span>
         </div>
 
+        {settings.contract_number && (
+          <div style={{border:'1px solid #000',padding:'3mm 4mm',marginBottom:'3mm',fontSize:'10pt'}}>
+            <strong>계약번호:</strong> {settings.contract_number}
+            {settings.contract_start && settings.contract_end && (
+              <span style={{marginLeft:'12mm'}}>
+                <strong>계약기간:</strong> {settings.contract_start} ~ {settings.contract_end}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="party-grid">
           <div className="party-box">
             <div className="party-title">공급받는자 (발주처)</div>

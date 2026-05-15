@@ -73,12 +73,30 @@ export default function SettingsPage({ initialSettings }) {
         </div>
 
         <div className="card">
-          <h2>요금 및 기간 설정</h2>
+          <h2>계약 정보</h2>
           <div className="form-grid">
+            <div className="form-group">
+              <label>계약번호</label>
+              <input type="text" value={form.contract_number||''} onChange={e=>set('contract_number',e.target.value)} placeholder="예) 2026-환경-001" />
+            </div>
+            <div className="form-group">
+              <label>계약 시작일</label>
+              <input type="date" value={form.contract_start||''} onChange={e=>set('contract_start',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>계약 종료일</label>
+              <input type="date" value={form.contract_end||''} onChange={e=>set('contract_end',e.target.value)} />
+            </div>
             <div className="form-group">
               <label>수거 단가 (원/톤)</label>
               <input type="number" step="0.01" value={form.unit_price||0} onChange={e=>set('unit_price',e.target.value)} />
             </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <h2>보고서 기간 설정</h2>
+          <div className="form-grid">
             <div className="form-group">
               <label>보고서 기간 시작일 (전월 기준)</label>
               <input type="number" min="1" max="31" value={form.period_start_day||27} onChange={e=>set('period_start_day',e.target.value)} />
