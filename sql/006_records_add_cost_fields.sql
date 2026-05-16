@@ -1,0 +1,6 @@
+-- records 테이블: 비용 지출 필드 추가
+ALTER TABLE records ADD COLUMN IF NOT EXISTS fuel_cost  NUMERIC;
+ALTER TABLE records ADD COLUMN IF NOT EXISTS urea_cost  NUMERIC;
+ALTER TABLE records ADD COLUMN IF NOT EXISTS meal_cost  NUMERIC;
+ALTER TABLE records ADD COLUMN IF NOT EXISTS other_cost NUMERIC;
+ALTER TABLE records ADD COLUMN IF NOT EXISTS other_note TEXT;

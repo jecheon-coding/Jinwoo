@@ -87,7 +87,7 @@ export default function ReportMenuPage({ role, year, month, ps, pe, contracts, c
         const stats     = contractStats[c.id] || { workDays: 0, totalW: 0 };
         const unitPrice = parseFloat(c.unit_price) || 0;
         const billing   = Math.floor(stats.totalW * unitPrice / 1000) * 1000;
-        const cb        = `${base}?contract=${c.id}`;
+        const cq = `?contract=${c.id}`;
 
         return (
           <div key={c.id} className="card" style={{marginBottom:'16px'}}>
@@ -112,7 +112,7 @@ export default function ReportMenuPage({ role, year, month, ps, pe, contracts, c
                 <div style={{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}}>
                   계근현황 · 칩수거현황 · 일일근무현황 · 근무확인서 (4장)
                 </div>
-                <Link href={`${cb}&type=work`} className="btn btn-primary btn-sm"
+                <Link href={`${base}/work${cq}`} className="btn btn-primary btn-sm"
                   style={{display:'block',textAlign:'center'}}>열기 / 인쇄</Link>
               </div>
               <div style={{border:'1px solid #e5e7eb',borderRadius:'8px',padding:'12px'}}>
@@ -120,13 +120,13 @@ export default function ReportMenuPage({ role, year, month, ps, pe, contracts, c
                 <div style={{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}}>
                   대금청구서 · 기성부분검사원 · 기성계 · 노무비청구 · 지급 (5장)
                 </div>
-                <Link href={`${cb}&type=billing`} className="btn btn-primary btn-sm"
+                <Link href={`${base}/billing${cq}`} className="btn btn-primary btn-sm"
                   style={{display:'block',textAlign:'center'}}>열기 / 인쇄</Link>
               </div>
             </div>
 
             <div style={{textAlign:'center'}}>
-              <Link href={`${cb}&type=all`} className="btn btn-outline btn-sm">
+              <Link href={`${base}/all${cq}`} className="btn btn-outline btn-sm">
                 전체 9장 한번에 출력
               </Link>
             </div>

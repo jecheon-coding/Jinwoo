@@ -16,8 +16,7 @@ CREATE TABLE IF NOT EXISTS workers (
 );
 
 CREATE TABLE IF NOT EXISTS records (
-  id             SERIAL PRIMARY KEY,
-  record_date    DATE NOT NULL,
+  record_date    DATE PRIMARY KEY,  -- 실제 DB는 record_date가 PK (id 없음)
   vehicle_number TEXT,
   driver         TEXT,
   route          TEXT,

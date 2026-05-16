@@ -20,6 +20,7 @@ export default function Layout({ children, role }) {
             <Link href="/daily" className={active('/daily')}>일일 입력</Link>
             {isAdmin && <>
               <Link href="/history" className={active('/history')}>월별 조회</Link>
+              <Link href="/expenses" className={active('/expenses')}>비용 관리</Link>
               <Link href="/workers" className={active('/workers')}>작업자</Link>
               <Link href="/contracts" className={active('/contracts')}>계약</Link>
               <Link href="/settings" className={active('/settings')}>설정</Link>

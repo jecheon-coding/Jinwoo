@@ -102,7 +102,7 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
         <h1>{year}년 {month}월 수거 기록</h1>
         <div className="btn-group">
           <Link href={`/report/${year}/${month}`} className="btn btn-success">보고서 출력</Link>
-          <Link href={`/daily/${new Date().toISOString().slice(0,10)}`} className="btn btn-outline">오늘 입력</Link>
+          <Link href={`/daily/${new Intl.DateTimeFormat('sv',{timeZone:'Asia/Seoul'}).format(new Date())}/${contractId}`} className="btn btn-outline">오늘 입력</Link>
         </div>
       </div>
 
@@ -158,7 +158,7 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
       {records.length === 0 ? (
         <div className="empty">
           <p>이 달에 입력된 기록이 없습니다.</p>
-          <Link href={`/daily/${new Date().toISOString().slice(0,10)}/${contractId}`}
+          <Link href={`/daily/${new Intl.DateTimeFormat('sv',{timeZone:'Asia/Seoul'}).format(new Date())}/${contractId}`}
             className="btn btn-primary">첫 기록 입력</Link>
         </div>
       ) : (
@@ -189,13 +189,12 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
                     <td className="num">{cl.toLocaleString()}</td>
                     <td className="num">{r.trips||1}</td>
                     <td>
-                      <a href={`/log/${r.record_date}?contract=${contractId}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="btn btn-outline btn-sm">🖨</a>
+                      <Link href={`/log/${r.record_date}?contract=${contractId}`}
+                        className="btn btn-outline btn-sm">🖨</Link>
                     </td>
                     <td>
                       <div style={{display:'flex',gap:'4px',justifyContent:'center'}}>
-                        <Link href={`/daily/${r.record_date}/${contractId}`}
+                        <Link href={`/daily/${r.record_date}/${contractId}?edit=1`}
                           className="btn btn-outline btn-sm">수정</Link>
                         <button className="btn btn-danger btn-sm"
                           onClick={() => handleDelete(r.record_date)}>삭제</button>

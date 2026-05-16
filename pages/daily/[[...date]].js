@@ -4,7 +4,11 @@ import Link from 'next/link';
 import supabase from '../../lib/supabase';
 import { requireAuth, getRole } from '../../lib/auth';
 
-export async function getServerSideProps({ req, params }) {
+function getKSTDate() {
+  return new Intl.DateTimeFormat('sv', { timeZone: 'Asia/Seoul' }).format(new Date());
+}
+
+export async function getServerSideProps({ req, params, query }) {
   const authRedirect = requireAuth(req, false);
   if (authRedirect) return authRedirect;
 
@@ -12,7 +16,8 @@ export async function getServerSideProps({ req, params }) {
   const dateParam     = params?.date?.[0];
   const contractIdStr = params?.date?.[1];
   const contractId    = contractIdStr ? parseInt(contractIdStr) : null;
-  const today         = new Date().toISOString().slice(0, 10);
+  const editMode      = query.edit === '1';
+  const today         = getKSTDate();
   const recordDate    = dateParam || today;
 
   // 날짜가 없으면 오늘로 리다이렉트
@@ -45,23 +50,45 @@ export async function getServerSideProps({ req, params }) {
   // 계약 ID가 있으면 입력폼
   const contract = contracts.find(c => c.id === contractId) || null;
 
-  const [wRes, attRes, recRes] = await Promise.all([
+  const queries = [
     supabase.from('workers').select('*').eq('active', true).order('sort_order').order('id'),
-    supabase.from('attendance').select('*').eq('record_date', recordDate).eq('contract_id', contractId),
-    supabase.from('records').select('*').eq('record_date', recordDate).eq('contract_id', contractId).maybeSingle(),
-  ]);
+    supabase.from('records').select('end_km').lt('record_date', recordDate).eq('contract_id', contractId).order('record_date', { ascending: false }).limit(1).maybeSingle(),
+  ];
+  if (editMode) {
+    queries.push(
+      supabase.from('attendance').select('*').eq('record_date', recordDate).eq('contract_id', contractId),
+      supabase.from('records').select('*').eq('record_date', recordDate).eq('contract_id', contractId).maybeSingle(),
+    );
+  }
+  const [wRes, prevRecRes, attRes, recRes] = await Promise.all(queries);
+
+  let record = recRes?.data || null;
+  let attData = attRes?.data || [];
+
+  // 수정 모드에서 레거시 레코드 fallback
+  if (editMode && !record && contractId) {
+    const [legacyRec, legacyAtt] = await Promise.all([
+      supabase.from('records').select('*').eq('record_date', recordDate).is('contract_id', null).maybeSingle(),
+      supabase.from('attendance').select('*').eq('record_date', recordDate).is('contract_id', null),
+    ]);
+    record  = legacyRec.data || null;
+    attData = legacyAtt.data || attData;
+  }
 
   const attMap = {};
-  (attRes.data || []).forEach(a => { attMap[a.worker_id] = a.value; });
+  attData.forEach(a => { attMap[a.worker_id] = a.value; });
+
+  const prevEndKm = prevRecRes.data?.end_km ?? null;
 
   return {
     props: {
       role, recordDate, contracts, settings,
       mode: 'form',
       contract, contractId,
-      record: recRes.data || null,
+      record,
       workers: wRes.data || [],
       attMap,
+      prevEndKm,
     },
   };
 }
@@ -113,10 +140,11 @@ export default function DailyPage(props) {
   }
 
   // ── 입력 폼
-  return <DailyForm {...props} router={router} />;
+  return <DailyForm key={`${props.recordDate}-${props.contractId}`} {...props} router={router} />;
 }
 
-function DailyForm({ role, recordDate, contracts, settings, contract, contractId, record, workers, attMap, router }) {
+function DailyForm({ role, recordDate, contracts, settings, contract, contractId, record, workers, attMap, prevEndKm, router }) {
+  const isSaturday = new Date(recordDate).getDay() === 6;
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     record_date:    recordDate,
@@ -124,12 +152,19 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
     vehicle_number: record?.vehicle_number ?? settings.vehicle_number ?? '',
     driver:         record?.driver         ?? settings.driver ?? '',
     route:          record?.route          ?? contract?.area ?? '',
-    op_start:       record?.op_start       ?? '',
+    op_start:       record?.op_start       ?? '06:00',
     op_end:         record?.op_end         ?? '',
     trips:          record?.trips          ?? 1,
-    start_km:       record?.start_km       ?? '',
+    start_km:       record?.start_km       ?? prevEndKm ?? '',
     end_km:         record?.end_km         ?? '',
     fuel:           record?.fuel           ?? '',
+    fuel_cost:      record?.fuel_cost      ?? '',
+    urea:           record?.urea           ?? '',
+    urea_cost:      record?.urea_cost      ?? '',
+    fuel_note:      record?.fuel_note      ?? '',
+    meal_cost:      record?.meal_cost      ?? '',
+    other_cost:     record?.other_cost     ?? '',
+    other_note:     record?.other_note     ?? '',
     weight_1:       record?.weight_1       ?? '',
     weight_2:       record?.weight_2       ?? '',
     weight_3:       record?.weight_3       ?? '',
@@ -141,7 +176,8 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
   });
   const [att, setAtt] = useState(() => {
     const init = {};
-    workers.forEach(w => { init[w.id] = attMap[w.id] ?? 1.0; });
+    const defaultVal = isSaturday ? 0.5 : 1.0;
+    workers.forEach(w => { init[w.id] = attMap[w.id] ?? defaultVal; });
     return init;
   });
 
@@ -169,7 +205,7 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
     const body = { ...form, attendance };
     ['weight_1','weight_2','weight_3'].forEach(k => { body[k] = parseFloat(body[k]) || 0; });
     ['chip_3l','chip_5l','chip_20l','chip_120l','trips'].forEach(k => { body[k] = parseInt(body[k]) || 0; });
-    ['start_km','end_km','fuel'].forEach(k => { body[k] = body[k] !== '' && body[k] != null ? parseFloat(body[k]) : null; });
+    ['start_km','end_km','fuel','urea','fuel_cost','urea_cost','meal_cost','other_cost'].forEach(k => { body[k] = body[k] !== '' && body[k] != null ? parseFloat(body[k]) : null; });
 
     const res = await fetch('/api/records', {
       method: 'POST',
@@ -197,10 +233,10 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
         <h1>일일 운행 입력</h1>
         <div className="btn-group">
           {record && (
-            <a href={`/log/${form.record_date}?contract=${contractId}`} target="_blank"
+            <Link href={`/log/${form.record_date}?contract=${contractId}`}
                className="btn btn-outline btn-sm">
               🖨 일지 출력
-            </a>
+            </Link>
           )}
           {record && (
             <button className="btn btn-danger btn-sm" onClick={handleDelete}>삭제</button>
@@ -244,17 +280,17 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
             <div className="form-group">
               <label>행선지 / 구역</label>
               <input type="text" value={form.route}
-                onChange={e => set('route', e.target.value)} placeholder="예) 영월읍 2구역" />
+                onChange={e => set('route', e.target.value)} placeholder="예) 영월읍(2구역) 지역내 음식물 수집.운반" />
             </div>
             <div className="form-group">
               <label>운행시작</label>
-              <input type="time" value={form.op_start}
-                onChange={e => set('op_start', e.target.value)} />
+              <TimePicker24h value={form.op_start} defaultHour="06"
+                onChange={v => set('op_start', v)} />
             </div>
             <div className="form-group">
               <label>운행종료</label>
-              <input type="time" value={form.op_end}
-                onChange={e => set('op_end', e.target.value)} />
+              <TimePicker24h value={form.op_end} defaultHour="18"
+                onChange={v => set('op_end', v)} />
             </div>
             <div className="form-group">
               <label>운행횟수</label>
@@ -276,7 +312,58 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
               <input type="number" step="0.1" value={form.fuel}
                 onChange={e => set('fuel', e.target.value)} placeholder="0.0" />
             </div>
+            <div className="form-group">
+              <label>요소수 (개)</label>
+              <input type="number" step="1" value={form.urea}
+                onChange={e => set('urea', e.target.value)} placeholder="0" />
+            </div>
+            <div className="form-group">
+              <label>기타</label>
+              <input type="text" value={form.fuel_note}
+                onChange={e => set('fuel_note', e.target.value)} placeholder="" />
+            </div>
           </div>
+        </div>
+
+        {/* 비용 지출 */}
+        <div className="card">
+          <h2>비용 지출</h2>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>주유비 (원)</label>
+              <input type="number" min="0" step="1" value={form.fuel_cost}
+                onChange={e => set('fuel_cost', e.target.value)} placeholder="0" />
+            </div>
+            <div className="form-group">
+              <label>요소수 비용 (원)</label>
+              <input type="number" min="0" step="1" value={form.urea_cost}
+                onChange={e => set('urea_cost', e.target.value)} placeholder="0" />
+            </div>
+            <div className="form-group">
+              <label>식비 (원)</label>
+              <input type="number" min="0" step="1" value={form.meal_cost}
+                onChange={e => set('meal_cost', e.target.value)} placeholder="0" />
+            </div>
+            <div className="form-group">
+              <label>기타 비용 (원)</label>
+              <input type="number" min="0" step="1" value={form.other_cost}
+                onChange={e => set('other_cost', e.target.value)} placeholder="0" />
+            </div>
+            <div className="form-group">
+              <label>기타 내용</label>
+              <input type="text" value={form.other_note}
+                onChange={e => set('other_note', e.target.value)} placeholder="" />
+            </div>
+          </div>
+          {(() => {
+            const total = (parseFloat(form.fuel_cost)||0) + (parseFloat(form.urea_cost)||0)
+              + (parseFloat(form.meal_cost)||0) + (parseFloat(form.other_cost)||0);
+            return total > 0 ? (
+              <div style={{marginTop:'10px',fontWeight:'700',color:'#1e40af'}}>
+                합계: {total.toLocaleString()} 원
+              </div>
+            ) : null;
+          })()}
         </div>
 
         {/* 계근 */}
@@ -362,5 +449,41 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
         </div>
       </form>
     </>
+  );
+}
+
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINS  = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+
+function TimePicker24h({ value, onChange, defaultHour }) {
+  const [h, m] = value ? value.split(':') : ['', ''];
+
+  const selStyle = {
+    border: '1px solid var(--gray2)', borderRadius: '6px',
+    padding: '9px 4px', fontSize: '15px', fontFamily: 'inherit',
+    minHeight: '44px', flex: 1, textAlign: 'center',
+  };
+
+  const update = (newH, newM) => {
+    const hh = newH !== '' ? newH : (defaultHour || '00');
+    const mm = newM !== '' ? newM : '00';
+    if (newH === '' && newM === '') { onChange(''); return; }
+    onChange(`${hh}:${mm}`);
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <select value={h} style={selStyle}
+        onChange={e => update(e.target.value, m)}>
+        <option value="">--</option>
+        {HOURS.map(v => <option key={v} value={v}>{v}</option>)}
+      </select>
+      <span style={{ fontWeight: '700', fontSize: '16px' }}>:</span>
+      <select value={m || (h ? '00' : '')} style={selStyle}
+        onChange={e => update(h || defaultHour || '00', e.target.value)}>
+        <option value="">--</option>
+        {MINS.map(v => <option key={v} value={v}>{v}</option>)}
+      </select>
+    </div>
   );
 }

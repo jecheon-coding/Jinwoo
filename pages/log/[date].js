@@ -1,9 +1,27 @@
+import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import supabase from '../../lib/supabase';
 import { requireAuth } from '../../lib/auth';
 
 LogPage.noLayout = true;
 
+const LogPDFButton = dynamic(() => import('../../components/LogPDFButton'), { ssr: false });
+
 const DAYS = ['일','월','화','수','목','금','토'];
+
+function fmtKm(v) {
+  if (v == null || v === '') return '';
+  const n = Number(v);
+  return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(3);
+}
+
+function fmtChip(v) {
+  return v ? String(v) : '';
+}
+
+function fmtName(v) {
+  return v ? v.split('').join(' ') : '';
+}
 
 export async function getServerSideProps({ req, params, query }) {
   const authRedirect = requireAuth(req, false);
@@ -12,8 +30,8 @@ export async function getServerSideProps({ req, params, query }) {
   const { date } = params;
   const contractId = query.contract ? parseInt(query.contract) : null;
 
-  let recQ  = supabase.from('records').select('*').eq('record_date', date);
-  let attQ  = supabase.from('attendance').select('*').eq('record_date', date);
+  let recQ = supabase.from('records').select('*').eq('record_date', date);
+  let attQ = supabase.from('attendance').select('*').eq('record_date', date);
   if (contractId) {
     recQ = recQ.eq('contract_id', contractId);
     attQ = attQ.eq('contract_id', contractId);
@@ -31,223 +49,378 @@ export async function getServerSideProps({ req, params, query }) {
 
   const attMap = {};
   (attRes.data || []).forEach(a => { attMap[a.worker_id] = a.value; });
-
-  // 출근한 작업자만 필터
   const presentWorkers = (wRes.data || []).filter(w => (attMap[w.id] || 0) > 0);
 
   return {
-    props: {
-      date,
-      record: recRes.data || null,
-      presentWorkers,
-      settings,
-    },
+    props: { date, record: recRes.data || null, presentWorkers, settings },
   };
 }
 
 export default function LogPage({ date, record, presentWorkers, settings }) {
-  const d    = new Date(date);
-  const dow  = DAYS[d.getDay()];
-  const ymd  = `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`;
+  const d   = new Date(date);
+  const dow = DAYS[d.getDay()];
+  const ymd = `${d.getFullYear()}.  ${d.getMonth()+1}.  ${d.getDate()}.`;
 
-  const r = record || {};
-  const startKm = r.start_km != null ? Number(r.start_km).toFixed(3) : '';
-  const endKm   = r.end_km   != null ? Number(r.end_km).toFixed(3)   : '';
-  const dist    = (r.start_km != null && r.end_km != null)
-    ? (Number(r.end_km) - Number(r.start_km)).toFixed(3) : '';
-
+  const r        = record || {};
+  const startKm  = fmtKm(r.start_km);
+  const endKm    = fmtKm(r.end_km);
+  const dist     = (r.start_km != null && r.end_km != null)
+    ? fmtKm(Number(r.end_km) - Number(r.start_km)) : '';
   const w1 = r.weight_1 ? Number(r.weight_1).toFixed(3) : '';
   const w2 = r.weight_2 ? Number(r.weight_2).toFixed(3) : '';
-  const w3 = r.weight_3 ? Number(r.weight_3).toFixed(3) : '';
-
   const workerNames = presentWorkers.map(w => w.name).join(', ');
+  const area = r.route ? r.route.split('(')[0].split(' ')[0] + ' ~' : '';
 
-  const css = `
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: '맑은 고딕','Malgun Gothic',sans-serif; background:#fff; color:#000; }
-    .print-btn { position: fixed; top: 12px; right: 12px; background: #2563eb; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; z-index: 100; }
-    @media print { .print-btn { display: none; } @page { size: A4; margin: 8mm; } }
-    .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 8mm 8mm; font-size: 10pt; }
-    .main-title { text-align: center; font-size: 16pt; font-weight: bold; letter-spacing: 6px; margin-bottom: 5mm; }
-    table { border-collapse: collapse; width: 100%; }
-    td, th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; font-size: 10pt; }
-    .label { background: #f0f0f0; text-align: center; font-weight: bold; white-space: nowrap; }
-    .section-title { text-align: center; font-weight: bold; font-size: 11pt; letter-spacing: 4px; background: #f5f5f5; }
-    .approval-cell { text-align: center; min-width: 18mm; min-height: 14mm; }
-    .tall { height: 10mm; }
-    .taller { height: 14mm; }
-    .checkbox { display: inline-block; width: 12px; height: 12px; border: 1px solid #000; margin-right: 3px; text-align: center; line-height: 11px; font-size: 10px; vertical-align: middle; }
-    .checked::after { content: '✓'; font-size: 9px; }
-    .footer-company { text-align: right; font-size: 9pt; margin-top: 3mm; font-weight: bold; }
-  `;
+  const pdfProps = { date, record, presentWorkers, settings };
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: css }} />
+      <style dangerouslySetInnerHTML={{ __html: `
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: '맑은 고딕','Malgun Gothic',sans-serif; background: #e5e7eb; color: #000; }
 
-      <button className="print-btn" onClick={() => window.print()}>🖨 인쇄</button>
+        .btn-bar {
+          position: sticky; top: 0; z-index: 100;
+          display: flex; justify-content: center; gap: 8px;
+          padding: 10px; background: #e5e7eb;
+        }
+        @media print { .btn-bar { display: none !important; } }
+        .btn-back {
+          background: #fff; color: #374151; border: 1px solid #9ca3af;
+          padding: 7px 18px; border-radius: 6px; font-size: 13px;
+          text-decoration: none; display: inline-block;
+        }
+        .btn-print {
+          background: #16a34a; color: #fff; border: none;
+          padding: 7px 18px; border-radius: 6px; font-size: 13px; cursor: pointer;
+        }
+
+        @media screen {
+          .page { box-shadow: 0 4px 20px rgba(0,0,0,0.3); margin: 0 auto 40px; }
+        }
+        @media print {
+          body { background: #fff; }
+          @page { size: A4 portrait; margin: 10mm 12mm; }
+        }
+        .page {
+          width: 210mm;
+          min-height: 277mm;
+          padding: 20mm 11mm 9mm 11mm;
+          background: #fff;
+          font-size: 11pt;
+        }
+
+        .title {
+          text-align: center; font-size: 17pt; font-weight: bold;
+          letter-spacing: 6px; margin-bottom: 7mm;
+        }
+
+        table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; border: 2px solid #000; }
+        td {
+          border-right: 1px solid #000;
+          border-bottom: 1px solid #000;
+          border-top: 1px solid #000;
+          border-left: 0;
+          padding: 3px 7px;
+          vertical-align: middle;
+          font-size: 11pt;
+          word-break: keep-all;
+          background: #fff;
+          line-height: 1.4;
+        }
+        td:last-child { border-right: 0; }
+        tr:first-child td { border-top: 0; }
+        tr:last-child td { border-bottom: 0; }
+
+        .lbl {
+          background: #fff; text-align: center;
+          font-weight: bold; white-space: nowrap;
+        }
+        .sec {
+          background: #fff; text-align: center;
+          font-weight: bold; font-size: 12pt; letter-spacing: 4px; padding: 5px;
+        }
+        .vert {
+          writing-mode: vertical-rl; text-orientation: mixed;
+          white-space: nowrap; letter-spacing: 3px; text-align: center;
+        }
+        .num { text-align: right; padding-right: 7px; }
+
+        .h9  { height: 6mm; }
+        .h11 { height: 10mm; }
+        .h12 td { padding-top: 2px !important; padding-bottom: 2px !important; }
+        .h13 { height: 10mm; }
+        .h15 { height: 10mm; }
+
+        .cb {
+          display: inline-block; width: 12px; height: 12px;
+          border: 1.5px solid #000; margin-right: 5px;
+          text-align: center; line-height: 11px; font-size: 11px;
+          vertical-align: middle;
+        }
+        .cb-on::after { content: '✓'; }
+
+        .mt { margin-top: 3mm; }
+
+        .header-wrap { display: flex; gap: 25mm; align-items: stretch; margin-bottom: 4mm; }
+        .header-left  { flex: 0 0 90mm; }
+        .header-right { flex: ; }
+        .header-left table, .header-right table { height: 100%; width: 100%; }
+
+        .footer { text-align: right; font-size: 11pt; margin-top: 4mm; font-weight: bold; }
+      `}} />
+
+      <div className="btn-bar">
+        <Link href="/history" className="btn-back">← 뒤로</Link>
+        <button className="btn-print" onClick={() => window.print()}>🖨 인쇄</button>
+        <LogPDFButton {...pdfProps} />
+      </div>
 
       <div className="page">
-        <div className="main-title">차 량 운 행 일 지 ( 작 업 일 지 )</div>
+        <div className="title">차 량 운 행 일 지 ( 작 업 일 지 )</div>
 
-        {/* ── 상단: 날짜/차량/결재 ── */}
-        <table style={{marginBottom:'3mm'}}>
-          <tbody>
-            <tr>
-              <td className="label" style={{width:'18mm'}}>날&nbsp;&nbsp;&nbsp;짜</td>
-              <td style={{width:'40mm'}}>{ymd}</td>
-              <td className="label" style={{width:'12mm'}}>요 일</td>
-              <td style={{width:'12mm',textAlign:'center',fontWeight:'bold'}}>{dow}</td>
-              <td rowSpan="3" className="label" style={{width:'10mm',writingMode:'vertical-rl',letterSpacing:'4px'}}>결재</td>
-              <td className="label approval-cell" style={{width:'20mm'}}>담&nbsp;&nbsp;당</td>
-              <td className="label approval-cell" style={{width:'20mm'}}>대표이사</td>
-            </tr>
-            <tr>
-              <td className="label">차 량 번 호</td>
-              <td colSpan="3">{r.vehicle_number || settings.vehicle_number || ''}</td>
-              <td className="taller"></td>
-              <td className="taller"></td>
-            </tr>
-            <tr>
-              <td className="label">운&nbsp;&nbsp;전&nbsp;&nbsp;자</td>
-              <td colSpan="3">{r.driver || settings.driver || ''}</td>
-              <td></td>
-              <td></td>
-            </tr>
-          </tbody>
-        </table>
+        {/* ── 상단: 날짜·차량 + 결재 ── */}
+        <div className="header-wrap">
+          <div className="header-left">
+            <table>
+              <colgroup>
+                <col />
+                <col style={{width:'55mm'}} />
+              </colgroup>
+              <tbody>
+                <tr className="h12">
+                  <td style={{paddingLeft:'8px'}}>{ymd}</td>
+                  <td style={{paddingLeft:'10px', textAlign:'left'}}>요 일 : {dow}</td>
+                </tr>
+                <tr className="h12">
+                  <td className="lbl" style={{letterSpacing:'2px'}}>차 량 번 호</td>
+                  <td style={{paddingLeft:'10px', textAlign:'left'}}>{r.vehicle_number || settings.vehicle_number || ''}</td>
+                </tr>
+                <tr className="h12">
+                  <td className="lbl" style={{letterSpacing:'2px'}}>운 &nbsp;&nbsp;전 &nbsp;&nbsp;자</td>
+                  <td style={{paddingLeft:'10px', textAlign:'left'}}>{fmtName(r.driver || settings.driver || '')}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="header-right">
+            <table>
+              <colgroup>
+                <col style={{width:'12mm'}} />
+                <col />
+                <col />
+              </colgroup>
+              <tbody>
+                <tr style={{height:'11mm'}}>
+                  <td rowSpan="2" className="vert" style={{fontWeight:'bold',letterSpacing:'4px'}}>결&nbsp;재</td>
+                  <td className="lbl" style={{letterSpacing:'2px'}}>담&nbsp;&nbsp;당</td>
+                  <td className="lbl" style={{letterSpacing:'2px'}}>대 표 이 사</td>
+                </tr>
+                <tr style={{height:'25mm'}}><td></td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         {/* ── 차량운행상황 ── */}
-        <table style={{marginBottom:'3mm'}}>
+        <table>
+          <colgroup>
+            <col style={{width:'9mm'}} />
+            <col style={{width:'25mm'}} />
+            <col style={{width:'29mm'}} />
+            <col style={{width:'9mm'}} />
+            <col style={{width:'10mm'}} />
+            <col style={{width:'35mm'}} />
+            <col />
+            <col style={{width:'20mm'}} />
+          </colgroup>
           <tbody>
             <tr>
-              <td colSpan="6" className="section-title">차 량 운 행 상 황</td>
+              <td colSpan="8" className="sec">차 량 운 행 상 황</td>
             </tr>
-            <tr>
-              <td className="label" rowSpan="3" style={{width:'8mm',writingMode:'vertical-rl',letterSpacing:'2px'}}>운행내역</td>
-              <td className="label" style={{width:'18mm'}}>운행시작</td>
-              <td style={{width:'28mm'}}>{startKm}</td>
-              <td className="label" style={{width:'8mm'}}>km</td>
-              <td className="label" rowSpan="3" style={{width:'14mm',writingMode:'vertical-rl',letterSpacing:'2px'}}>연료내역</td>
-              <td style={{width:'60mm'}}>
-                <table style={{border:'none',width:'100%'}}>
-                  <tbody>
-                    <tr>
-                      <td style={{border:'none',width:'50%'}} className="label">주&nbsp;&nbsp;유&nbsp;&nbsp;량</td>
-                      <td style={{border:'none',width:'30%'}}>{r.fuel || ''}</td>
-                      <td style={{border:'none',width:'20%'}} className="label">ℓ</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </td>
+            <tr className="h11">
+              <td rowSpan="3" className="lbl vert">운행내역</td>
+              <td className="lbl">운행시작</td>
+              <td className="num" colSpan={2}>{startKm} km</td>
+              <td rowSpan="3" className="lbl vert">연료내역</td>
+              <td className="lbl">주&nbsp;&nbsp;유&nbsp;&nbsp;량</td>
+              <td colSpan={2} style={{textAlign:'left', paddingLeft:'30px'}}>{r.fuel ? `${r.fuel} ℓ` : ''}</td>
             </tr>
-            <tr>
-              <td className="label">운행종료</td>
-              <td>{endKm}</td>
-              <td className="label">km</td>
-              <td style={{verticalAlign:'top',paddingTop:'2mm'}}>
-                <span className="label" style={{display:'inline-block',padding:'1px 4px'}}>기&nbsp;&nbsp;&nbsp;타</span>
-              </td>
+            <tr className="h11">
+              <td className="lbl">운행종료</td>
+              <td className="num" colSpan={2}>{endKm} km</td>
+              <td className="lbl">요&nbsp;&nbsp;소&nbsp;&nbsp;수</td>
+              <td colSpan={2} style={{textAlign:'left', paddingLeft:'30px'}}>{r.urea ? `${r.urea} 개` : ''}</td>
             </tr>
-            <tr>
-              <td className="label">운행거리</td>
-              <td>{dist}</td>
-              <td className="label">km</td>
-              <td></td>
+            <tr className="h11">
+              <td className="lbl">운행거리</td>
+              <td className="num" colSpan={2}>{dist} km</td>
+              <td className="lbl">기 &nbsp; &nbsp; &nbsp; 타</td>
+              <td colSpan={2}></td>
             </tr>
           </tbody>
         </table>
 
-        {/* ── 행선지/운행시간/내역 ── */}
-        <table style={{marginBottom:'3mm'}}>
+        {/* ── 행선지 / 운행시간 / 내역 ── */}
+        <table className="mt">
+          <colgroup>
+            <col style={{width:'34mm'}} />
+            <col style={{width:'38mm'}} />
+            <col />
+          </colgroup>
           <tbody>
-            <tr>
-              <td className="label" style={{width:'22mm'}}>행&nbsp;&nbsp;선&nbsp;&nbsp;지</td>
-              <td className="label" style={{width:'38mm'}}>운&nbsp;&nbsp;행&nbsp;&nbsp;시&nbsp;&nbsp;간</td>
-              <td className="label">내&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;역</td>
+            <tr className="h9">
+              <td className="lbl">행&nbsp;&nbsp;선&nbsp;&nbsp;지</td>
+              <td className="lbl">운&nbsp;&nbsp;행&nbsp;&nbsp;시&nbsp;&nbsp;간</td>
+              <td className="lbl">내&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;역</td>
             </tr>
-            <tr className="tall">
-              <td>{r.route ? r.route.split(' ')[0] || '' : ''}</td>
+            <tr className="h13">
+              <td style={{textAlign:'center'}}>{area}</td>
               <td style={{textAlign:'center'}}>
-                {r.op_start && r.op_end ? `${r.op_start} ~ ${r.op_end}` : ''}
+                {r.op_start && r.op_end ? `${r.op_start} ~ ${r.op_end}` : '~'}
               </td>
-              <td>{r.route || ''}</td>
+              <td style={{paddingLeft:'8px'}}>{r.route || ''}</td>
             </tr>
-            <tr className="tall"><td></td><td></td><td></td></tr>
-            <tr className="tall"><td></td><td></td><td></td></tr>
-            <tr className="tall"><td></td><td></td><td></td></tr>
+            {[0,1,2].map(i => (
+              <tr key={i} className="h13">
+                <td></td>
+                <td style={{textAlign:'center'}}>~</td>
+                <td></td>
+              </tr>
+            ))}
           </tbody>
         </table>
 
         {/* ── 작업인 / 작업내용 ── */}
-        <table style={{marginBottom:'3mm'}}>
+        <table className="mt">
+          <colgroup>
+            <col style={{width:'34mm'}} />
+            <col />
+          </colgroup>
           <tbody>
-            <tr>
-              <td className="label" style={{width:'18mm'}}>작&nbsp;&nbsp;업&nbsp;&nbsp;인</td>
-              <td>{workerNames}</td>
+            <tr className="h11">
+              <td className="lbl">작&nbsp;&nbsp;업&nbsp;&nbsp;인</td>
+              <td style={{textAlign:'left', paddingLeft:'10px'}}>{workerNames}</td>
             </tr>
-            <tr>
-              <td className="label" rowSpan="3">작업내용</td>
-              <td className="tall">
-                <span className={`checkbox ${record ? 'checked' : ''}`}></span> 음식물 수거
+            <tr className="h13">
+              <td className="lbl" rowSpan="3">작업내용</td>
+              <td style={{textAlign:'left', paddingLeft:'10px'}}>
+                <span className={`cb${record ? ' cb-on' : ''}`}></span>음식물 수거
               </td>
             </tr>
-            <tr>
-              <td className="tall">
-                <span className="checkbox"></span> 민원 내용:
+            <tr className="h13">
+              <td style={{textAlign:'left', paddingLeft:'10px'}}>
+                <span className="cb"></span>민원 내용 :
               </td>
             </tr>
-            <tr>
-              <td className="tall">
-                <span className="checkbox"></span> 기&nbsp;&nbsp;&nbsp;타: {r.notes || ''}
+            <tr className="h13">
+              <td style={{textAlign:'left', paddingLeft:'10px'}}>
+                <span className="cb"></span>기&nbsp;&nbsp; &nbsp; &nbsp;타 : {r.notes || ''}
               </td>
             </tr>
           </tbody>
         </table>
 
         {/* ── 계근량 / 칩수거현황 / 운행횟수 ── */}
-        <table>
+        <table className="mt">
+          <colgroup>
+            <col style={{width:'24mm'}} />
+            <col style={{width:'24mm'}} />
+            <col style={{width:'24mm'}} />
+            <col style={{width:'10mm'}} />
+            <col style={{width:'13mm'}} />
+            <col style={{width:'15mm'}} />
+            <col style={{width:'8mm'}} />
+            <col style={{width:'40mm'}} />
+          </colgroup>
           <tbody>
-            <tr>
-              <td colSpan="3" className="section-title" style={{width:'55mm'}}>계&nbsp;&nbsp;근&nbsp;&nbsp;량</td>
-              <td rowSpan="3" className="label" style={{width:'10mm',writingMode:'vertical-rl',letterSpacing:'2px'}}>칩수거현황</td>
-              <td className="label" style={{width:'10mm'}}>3ℓ</td>
-              <td style={{width:'14mm',textAlign:'right'}}>{r.chip_3l || 0}</td>
-              <td className="label" style={{width:'8mm'}}>개</td>
-              <td rowSpan="3" className="label" style={{width:'20mm',textAlign:'center',lineHeight:'1.6'}}>
-                운행 횟수<br/>(환경사업소)
-              </td>
+            <tr className="h9">
+              <td colSpan="3" className="sec">계&nbsp;&nbsp;근&nbsp;&nbsp;량</td>
+              <td rowSpan="4" className="lbl vert" style={{fontSize:'9pt',letterSpacing:'2px'}}>칩수거현황</td>
+              <td style={{fontSize:'9pt', textAlign:'right', paddingRight:'10px'}}>3ℓ</td>
+              <td colSpan="2" style={{textAlign:'right', paddingRight:'10px'}}>{fmtChip(r.chip_3l)} 개</td>
+              <td
+                  rowSpan="4"
+                  style={{
+                    position:'relative',
+                    padding:0,
+                    textAlign:'center'
+                  }}
+                >
+                  {/* 상단 영역 */}
+                  <div
+                    style={{
+                      position:'absolute',
+                      top:0,
+                      left:0,
+                      right:0,
+                      height:'50%',
+                      display:'flex',
+                      alignItems:'center',
+                      justifyContent:'center',
+                      flexDirection:'column',
+                      fontWeight:'bold',
+                      fontSize:'9.5pt',
+                      lineHeight:'1.6'
+                    }}
+                  >
+                    <div>운행 횟수</div>
+                    <div>(환경사업소)</div>
+                  </div>
+
+                  {/* 가운데 선 */}
+                  <div
+                    style={{
+                      position:'absolute',
+                      left:0,
+                      right:0,
+                      top:'50%',
+                      borderTop:'1px solid black'
+                    }}
+                  />
+
+                  {/* 하단 영역 */}
+                  <div
+                    style={{
+                      position:'absolute',
+                      bottom:0,
+                      left:0,
+                      right:0,
+                      height:'50%',
+                      display:'flex',
+                      alignItems:'center',
+                      justifyContent:'center',
+                      fontSize:'14pt',
+                      fontWeight:'bold'
+                    }}
+                  >
+                    {r.trips ? `${r.trips} 회` : ''}
+                  </div>
+                </td>
             </tr>
-            <tr>
-              <td className="label" style={{width:'18mm'}}>1차</td>
-              <td className="label" style={{width:'18mm'}}>2차</td>
-              <td className="label" style={{width:'19mm'}}>비고</td>
-              <td className="label">5ℓ</td>
-              <td style={{textAlign:'right'}}>{r.chip_5l || 0}</td>
-              <td className="label">개</td>
+            <tr className="h9">
+              <td className="lbl">1 차</td>
+              <td className="lbl">2 차</td>
+              <td className="lbl">비&nbsp;&nbsp;고</td>
+              <td style={{fontSize:'9pt', textAlign:'right', paddingRight:'10px'}}>5ℓ</td>
+              <td colSpan="2" style={{textAlign:'right', paddingRight:'10px', borderRight:'1px solid black'}}>{fmtChip(r.chip_5l)} 개</td>
             </tr>
-            <tr>
-              <td style={{height:'14mm',fontSize:'11pt',fontWeight:'bold',textAlign:'center'}}>{w1}</td>
-              <td style={{textAlign:'center'}}>{w2}</td>
-              <td></td>
-              <td className="label">20ℓ</td>
-              <td style={{textAlign:'right'}}>{r.chip_20l || 0}</td>
-              <td className="label">개</td>
+            <tr className="h15">
+              <td rowSpan="2" style={{textAlign:'center',fontSize:'12pt',fontWeight:'bold',verticalAlign:'middle'}}>{w1}</td>
+              <td rowSpan="2" style={{textAlign:'center',fontSize:'12pt',fontWeight:'bold',verticalAlign:'middle'}}>{w2}</td>
+              <td rowSpan="2"></td>
+              <td style={{fontSize:'9pt', textAlign:'right', paddingRight:'10px'}}>20ℓ</td>
+              <td colSpan="2" style={{textAlign:'right', paddingRight:'10px', borderRight:'1px solid black'}}>{fmtChip(r.chip_20l)} 개</td>
             </tr>
-            <tr>
-              <td colSpan="3"></td>
-              <td className="label" style={{textAlign:'right',paddingRight:'2mm'}}></td>
-              <td className="label">120ℓ</td>
-              <td style={{textAlign:'right'}}>{r.chip_120l || 0}</td>
-              <td className="label">개</td>
-              <td style={{textAlign:'center',fontSize:'13pt',fontWeight:'bold'}}>
-                {r.trips || 1} 회
-              </td>
+            <tr className="h11">
+              <td style={{fontSize:'9pt', textAlign:'right', paddingRight:'10px'}}>120ℓ</td>
+              <td colSpan="2" style={{textAlign:'right', paddingRight:'10px', borderRight:'1px solid black'}}>{fmtChip(r.chip_120l)} 개</td>
             </tr>
           </tbody>
         </table>
 
-        <div className="footer-company">{settings.company_name || '주식회사 진우환경'}</div>
+        <div className="footer">{settings.company_name || '주식회사 진우환경'}</div>
       </div>
     </>
   );
