@@ -1,11 +1,16 @@
 import { useState } from 'react';
 import supabase from '../lib/supabase';
+import { requireAuth, getRole } from '../lib/auth';
 
-export async function getServerSideProps() {
+export async function getServerSideProps({ req }) {
+  const authRedirect = requireAuth(req, true);
+  if (authRedirect) return authRedirect;
+
+  const role = getRole(req);
   const { data } = await supabase.from('settings').select('*');
   const settings = {};
   (data || []).forEach(r => { settings[r.key] = r.value; });
-  return { props: { initialSettings: settings } };
+  return { props: { role, initialSettings: settings } };
 }
 
 export default function SettingsPage({ initialSettings }) {
@@ -36,75 +41,74 @@ export default function SettingsPage({ initialSettings }) {
       </div>
 
       <form onSubmit={handleSubmit}>
+
+        {/* 공급자 정보 */}
         <div className="card">
           <h2>공급자 (청구인) 정보</h2>
           <div className="form-grid">
             <div className="form-group">
               <label>회사명 / 상호</label>
-              <input type="text" value={form.company_name||''} onChange={e=>set('company_name',e.target.value)} placeholder="예) 진우환경" />
+              <input type="text" value={form.company_name||''} onChange={e=>set('company_name',e.target.value)} placeholder="예) (주)진우환경" />
+            </div>
+            <div className="form-group">
+              <label>대표자명</label>
+              <input type="text" value={form.ceo_name||''} onChange={e=>set('ceo_name',e.target.value)} placeholder="예) 지해옥" />
             </div>
             <div className="form-group">
               <label>사업자등록번호</label>
               <input type="text" value={form.company_reg||''} onChange={e=>set('company_reg',e.target.value)} placeholder="000-00-00000" />
             </div>
+            <div className="form-group">
+              <label>전화번호</label>
+              <input type="text" value={form.company_tel||''} onChange={e=>set('company_tel',e.target.value)} placeholder="033-000-0000" />
+            </div>
             <div className="form-group col-span-2">
               <label>주소</label>
               <input type="text" value={form.company_addr||''} onChange={e=>set('company_addr',e.target.value)} />
             </div>
-            <div className="form-group">
-              <label>전화번호</label>
-              <input type="text" value={form.company_tel||''} onChange={e=>set('company_tel',e.target.value)} placeholder="000-0000-0000" />
-            </div>
           </div>
         </div>
 
+        {/* 입금 계좌 */}
         <div className="card">
-          <h2>발주처 (공급받는자) 정보</h2>
+          <h2>입금 계좌 정보</h2>
           <div className="form-grid">
             <div className="form-group">
-              <label>발주처명</label>
-              <input type="text" value={form.client_name||''} onChange={e=>set('client_name',e.target.value)} placeholder="예) 영월군청" />
+              <label>은행명</label>
+              <input type="text" value={form.bank_name||''} onChange={e=>set('bank_name',e.target.value)} placeholder="예) 신한은행" />
             </div>
             <div className="form-group">
-              <label>구역</label>
-              <input type="text" value={form.area||''} onChange={e=>set('area',e.target.value)} placeholder="예) 2구역" />
+              <label>계좌번호</label>
+              <input type="text" value={form.bank_account||''} onChange={e=>set('bank_account',e.target.value)} placeholder="000-000-000000" />
+            </div>
+            <div className="form-group">
+              <label>예금 종류</label>
+              <input type="text" value={form.bank_type||''} onChange={e=>set('bank_type',e.target.value)} placeholder="예) 기업자유예금" />
             </div>
           </div>
         </div>
 
+        {/* 요금 및 기간 */}
         <div className="card">
-          <h2>계약 정보</h2>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>계약번호</label>
-              <input type="text" value={form.contract_number||''} onChange={e=>set('contract_number',e.target.value)} placeholder="예) 2026-환경-001" />
-            </div>
-            <div className="form-group">
-              <label>계약 시작일</label>
-              <input type="date" value={form.contract_start||''} onChange={e=>set('contract_start',e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label>계약 종료일</label>
-              <input type="date" value={form.contract_end||''} onChange={e=>set('contract_end',e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label>수거 단가 (원/톤)</label>
-              <input type="number" step="0.01" value={form.unit_price||0} onChange={e=>set('unit_price',e.target.value)} />
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <h2>보고서 기간 설정</h2>
+          <h2>요금 및 기간 설정</h2>
+          <p style={{fontSize:'12px',color:'#9ca3af',marginBottom:'10px'}}>
+            수거 단가, 계약 정보, 발주처 정보는 <a href="/contracts" style={{color:'#2563eb'}}>계약 관리</a>에서 계약별로 설정하세요.
+          </p>
           <div className="form-grid">
             <div className="form-group">
               <label>보고서 기간 시작일 (전월 기준)</label>
               <input type="number" min="1" max="31" value={form.period_start_day||27} onChange={e=>set('period_start_day',e.target.value)} />
               <span style={{fontSize:'12px',color:'#9ca3af'}}>예) 27 → 전월 27일 ~ 당월 말일</span>
             </div>
+            <div className="form-group">
+              <label>노무비 지급일 (일)</label>
+              <input type="number" min="1" max="31" value={form.salary_payment_day||16} onChange={e=>set('salary_payment_day',e.target.value)} />
+              <span style={{fontSize:'12px',color:'#9ca3af'}}>예) 16 → 매월 16일 지급</span>
+            </div>
           </div>
         </div>
 
+        {/* 차량 기본값 */}
         <div className="card">
           <h2>차량 / 운전자 기본값</h2>
           <div className="form-grid">
@@ -115,6 +119,24 @@ export default function SettingsPage({ initialSettings }) {
             <div className="form-group">
               <label>기본 운전자</label>
               <input type="text" value={form.driver||''} onChange={e=>set('driver',e.target.value)} placeholder="이름" />
+            </div>
+          </div>
+        </div>
+
+        {/* 접근 비밀번호 */}
+        <div className="card">
+          <h2>접근 비밀번호</h2>
+          <p style={{fontSize:'12px',color:'#9ca3af',marginBottom:'10px'}}>
+            비밀번호를 비워두면 기본값(관리자: admin / 사용자: user)이 사용됩니다.
+          </p>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>관리자 비밀번호</label>
+              <input type="text" value={form.admin_password||''} onChange={e=>set('admin_password',e.target.value)} placeholder="관리자용 비밀번호" />
+            </div>
+            <div className="form-group">
+              <label>사용자 비밀번호 (작업자용)</label>
+              <input type="text" value={form.user_password||''} onChange={e=>set('user_password',e.target.value)} placeholder="작업자용 비밀번호" />
             </div>
           </div>
         </div>

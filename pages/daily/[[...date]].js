@@ -1,46 +1,135 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import supabase from '../../lib/supabase';
+import { requireAuth, getRole } from '../../lib/auth';
 
-export async function getServerSideProps({ params }) {
-  const dateParam = params?.date?.[0];
-  const today = new Date().toISOString().slice(0, 10);
-  const recordDate = dateParam || today;
+export async function getServerSideProps({ req, params }) {
+  const authRedirect = requireAuth(req, false);
+  if (authRedirect) return authRedirect;
 
-  const [recRes, wRes, attRes, setRes] = await Promise.all([
-    supabase.from('records').select('*').eq('record_date', recordDate).maybeSingle(),
-    supabase.from('workers').select('*').eq('active', true).order('sort_order').order('id'),
-    supabase.from('attendance').select('*').eq('record_date', recordDate),
+  const role = getRole(req);
+  const dateParam     = params?.date?.[0];
+  const contractIdStr = params?.date?.[1];
+  const contractId    = contractIdStr ? parseInt(contractIdStr) : null;
+  const today         = new Date().toISOString().slice(0, 10);
+  const recordDate    = dateParam || today;
+
+  // 날짜가 없으면 오늘로 리다이렉트
+  if (!dateParam) {
+    return { redirect: { destination: `/daily/${today}`, permanent: false } };
+  }
+
+  const [contRes, setRes] = await Promise.all([
+    supabase.from('contracts').select('*').eq('active', true).order('sort_order').order('id'),
     supabase.from('settings').select('*'),
   ]);
-
-  const settings = {};
+  const contracts = contRes.data || [];
+  const settings  = {};
   (setRes.data || []).forEach(r => { settings[r.key] = r.value; });
+
+  // 계약이 없으면 계약 없음 화면
+  if (contracts.length === 0) {
+    return { props: { role, recordDate, contracts: [], settings, mode: 'no-contract' } };
+  }
+
+  // contractId 없고 계약이 1개면 바로 리다이렉트
+  if (!contractId) {
+    if (contracts.length === 1) {
+      return { redirect: { destination: `/daily/${recordDate}/${contracts[0].id}`, permanent: false } };
+    }
+    // 계약 선택 화면
+    return { props: { role, recordDate, contracts, settings, mode: 'select' } };
+  }
+
+  // 계약 ID가 있으면 입력폼
+  const contract = contracts.find(c => c.id === contractId) || null;
+
+  const [wRes, attRes, recRes] = await Promise.all([
+    supabase.from('workers').select('*').eq('active', true).order('sort_order').order('id'),
+    supabase.from('attendance').select('*').eq('record_date', recordDate).eq('contract_id', contractId),
+    supabase.from('records').select('*').eq('record_date', recordDate).eq('contract_id', contractId).maybeSingle(),
+  ]);
+
   const attMap = {};
   (attRes.data || []).forEach(a => { attMap[a.worker_id] = a.value; });
 
   return {
     props: {
-      recordDate,
+      role, recordDate, contracts, settings,
+      mode: 'form',
+      contract, contractId,
       record: recRes.data || null,
       workers: wRes.data || [],
       attMap,
-      settings,
     },
   };
 }
 
-export default function DailyPage({ recordDate, record, workers, attMap, settings }) {
+export default function DailyPage(props) {
+  const { role, recordDate, contracts, settings, mode } = props;
   const router = useRouter();
+
+  // ── 계약 없음
+  if (mode === 'no-contract') {
+    return (
+      <>
+        <div className="page-header"><h1>일일 운행 입력</h1></div>
+        <div className="empty">
+          <p>등록된 계약이 없습니다. 먼저 계약을 등록해 주세요.</p>
+          <Link href="/contracts" className="btn btn-primary">계약 관리</Link>
+        </div>
+      </>
+    );
+  }
+
+  // ── 계약 선택
+  if (mode === 'select') {
+    return (
+      <>
+        <div className="page-header">
+          <h1>계약 선택</h1>
+          <span style={{fontSize:'14px',color:'#6b7280'}}>{recordDate}</span>
+        </div>
+        <p style={{marginBottom:'16px',color:'#6b7280',fontSize:'13px'}}>
+          오늘 작업할 계약(구역)을 선택하세요.
+        </p>
+        <div style={{display:'grid',gap:'12px'}}>
+          {contracts.map(c => (
+            <Link key={c.id} href={`/daily/${recordDate}/${c.id}`}
+              style={{textDecoration:'none'}}>
+              <div className="card" style={{cursor:'pointer',borderLeft:'4px solid #2563eb'}}>
+                <div style={{fontWeight:'700',fontSize:'15px'}}>{c.name}</div>
+                <div style={{fontSize:'13px',color:'#6b7280',marginTop:'4px'}}>
+                  {c.area && <span style={{marginRight:'16px'}}>구역: {c.area}</span>}
+                  {c.client_name && <span>발주처: {c.client_name}</span>}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  // ── 입력 폼
+  return <DailyForm {...props} router={router} />;
+}
+
+function DailyForm({ role, recordDate, contracts, settings, contract, contractId, record, workers, attMap, router }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     record_date:    recordDate,
+    contract_id:    contractId,
     vehicle_number: record?.vehicle_number ?? settings.vehicle_number ?? '',
     driver:         record?.driver         ?? settings.driver ?? '',
-    route:          record?.route          ?? '',
+    route:          record?.route          ?? contract?.area ?? '',
     op_start:       record?.op_start       ?? '',
     op_end:         record?.op_end         ?? '',
     trips:          record?.trips          ?? 1,
+    start_km:       record?.start_km       ?? '',
+    end_km:         record?.end_km         ?? '',
+    fuel:           record?.fuel           ?? '',
     weight_1:       record?.weight_1       ?? '',
     weight_2:       record?.weight_2       ?? '',
     weight_3:       record?.weight_3       ?? '',
@@ -56,17 +145,21 @@ export default function DailyPage({ recordDate, record, workers, attMap, setting
     return init;
   });
 
-  const totalW = (parseFloat(form.weight_1) || 0) + (parseFloat(form.weight_2) || 0) + (parseFloat(form.weight_3) || 0);
-  const sub3   = (parseInt(form.chip_3l)   || 0) * 3;
-  const sub5   = (parseInt(form.chip_5l)   || 0) * 5;
-  const sub20  = (parseInt(form.chip_20l)  || 0) * 20;
-  const sub120 = (parseInt(form.chip_120l) || 0) * 120;
+  const totalW   = (parseFloat(form.weight_1)||0) + (parseFloat(form.weight_2)||0) + (parseFloat(form.weight_3)||0);
+  const sub3     = (parseInt(form.chip_3l)  ||0) * 3;
+  const sub5     = (parseInt(form.chip_5l)  ||0) * 5;
+  const sub20    = (parseInt(form.chip_20l) ||0) * 20;
+  const sub120   = (parseInt(form.chip_120l)||0) * 120;
   const chipTotal = sub3 + sub5 + sub20 + sub120;
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleDateChange = (newDate) => {
-    router.push(`/daily/${newDate}`);
+    router.push(`/daily/${newDate}/${contractId}`);
+  };
+
+  const handleContractChange = (newCid) => {
+    router.push(`/daily/${form.record_date}/${newCid}`);
   };
 
   const handleSubmit = async (e) => {
@@ -74,9 +167,9 @@ export default function DailyPage({ recordDate, record, workers, attMap, setting
     setSaving(true);
     const attendance = workers.map(w => ({ worker_id: w.id, value: att[w.id] ?? 0 }));
     const body = { ...form, attendance };
-    // convert numbers
     ['weight_1','weight_2','weight_3'].forEach(k => { body[k] = parseFloat(body[k]) || 0; });
     ['chip_3l','chip_5l','chip_20l','chip_120l','trips'].forEach(k => { body[k] = parseInt(body[k]) || 0; });
+    ['start_km','end_km','fuel'].forEach(k => { body[k] = body[k] !== '' && body[k] != null ? parseFloat(body[k]) : null; });
 
     const res = await fetch('/api/records', {
       method: 'POST',
@@ -86,26 +179,47 @@ export default function DailyPage({ recordDate, record, workers, attMap, setting
     setSaving(false);
     if (res.ok) {
       const d = form.record_date;
-      router.push(`/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}`);
+      router.push(`/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}/${contractId}`);
     }
   };
 
   const handleDelete = async () => {
     if (!record) return;
     if (!confirm('이 날의 기록을 삭제하시겠습니까?')) return;
-    await fetch(`/api/records/${form.record_date}`, { method: 'DELETE' });
+    await fetch(`/api/records/${form.record_date}?contract_id=${contractId}`, { method: 'DELETE' });
     const d = form.record_date;
-    router.push(`/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}`);
+    router.push(`/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}/${contractId}`);
   };
 
   return (
     <>
       <div className="page-header">
         <h1>일일 운행 입력</h1>
-        {record && (
-          <button className="btn btn-danger btn-sm" onClick={handleDelete}>삭제</button>
-        )}
+        <div className="btn-group">
+          {record && (
+            <a href={`/log/${form.record_date}?contract=${contractId}`} target="_blank"
+               className="btn btn-outline btn-sm">
+              🖨 일지 출력
+            </a>
+          )}
+          {record && (
+            <button className="btn btn-danger btn-sm" onClick={handleDelete}>삭제</button>
+          )}
+        </div>
       </div>
+
+      {/* 계약 선택 탭 (복수 계약일 때) */}
+      {contracts.length > 1 && (
+        <div style={{display:'flex',gap:'8px',marginBottom:'16px',flexWrap:'wrap'}}>
+          {contracts.map(c => (
+            <button key={c.id}
+              onClick={() => handleContractChange(c.id)}
+              className={`btn btn-sm ${c.id === contractId ? 'btn-primary' : 'btn-outline'}`}>
+              {c.area || c.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit}>
         {/* 기본 정보 */}
@@ -119,47 +233,63 @@ export default function DailyPage({ recordDate, record, workers, attMap, setting
             </div>
             <div className="form-group">
               <label>차량번호</label>
-              <input type="text" value={form.vehicle_number} onChange={e => set('vehicle_number', e.target.value)} placeholder="89오4821" />
+              <input type="text" value={form.vehicle_number}
+                onChange={e => set('vehicle_number', e.target.value)} placeholder="89오4821" />
             </div>
             <div className="form-group">
               <label>운전자</label>
-              <input type="text" value={form.driver} onChange={e => set('driver', e.target.value)} placeholder="이름" />
+              <input type="text" value={form.driver}
+                onChange={e => set('driver', e.target.value)} placeholder="이름" />
             </div>
             <div className="form-group">
               <label>행선지 / 구역</label>
-              <input type="text" value={form.route} onChange={e => set('route', e.target.value)} placeholder="예) 영월읍 2구역" />
+              <input type="text" value={form.route}
+                onChange={e => set('route', e.target.value)} placeholder="예) 영월읍 2구역" />
             </div>
             <div className="form-group">
               <label>운행시작</label>
-              <input type="time" value={form.op_start} onChange={e => set('op_start', e.target.value)} />
+              <input type="time" value={form.op_start}
+                onChange={e => set('op_start', e.target.value)} />
             </div>
             <div className="form-group">
               <label>운행종료</label>
-              <input type="time" value={form.op_end} onChange={e => set('op_end', e.target.value)} />
+              <input type="time" value={form.op_end}
+                onChange={e => set('op_end', e.target.value)} />
             </div>
             <div className="form-group">
               <label>운행횟수</label>
-              <input type="number" min="1" value={form.trips} onChange={e => set('trips', e.target.value)} />
+              <input type="number" min="1" value={form.trips}
+                onChange={e => set('trips', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>시작 km</label>
+              <input type="number" step="0.001" value={form.start_km}
+                onChange={e => set('start_km', e.target.value)} placeholder="0.000" />
+            </div>
+            <div className="form-group">
+              <label>종료 km</label>
+              <input type="number" step="0.001" value={form.end_km}
+                onChange={e => set('end_km', e.target.value)} placeholder="0.000" />
+            </div>
+            <div className="form-group">
+              <label>주유량 (ℓ)</label>
+              <input type="number" step="0.1" value={form.fuel}
+                onChange={e => set('fuel', e.target.value)} placeholder="0.0" />
             </div>
           </div>
         </div>
 
-        {/* 계근 (톤) */}
+        {/* 계근 */}
         <div className="card">
           <h2>실중량 계근 (톤)</h2>
           <div className="form-grid form-grid-4">
-            <div className="form-group">
-              <label>1차 (톤)</label>
-              <input type="number" step="0.001" value={form.weight_1} onChange={e => set('weight_1', e.target.value)} placeholder="0.000" />
-            </div>
-            <div className="form-group">
-              <label>2차 (톤)</label>
-              <input type="number" step="0.001" value={form.weight_2} onChange={e => set('weight_2', e.target.value)} placeholder="0.000" />
-            </div>
-            <div className="form-group">
-              <label>3차 (톤)</label>
-              <input type="number" step="0.001" value={form.weight_3} onChange={e => set('weight_3', e.target.value)} placeholder="0.000" />
-            </div>
+            {[['weight_1','1차'],['weight_2','2차'],['weight_3','3차']].map(([k,lbl]) => (
+              <div className="form-group" key={k}>
+                <label>{lbl} (톤)</label>
+                <input type="number" step="0.001" value={form[k]}
+                  onChange={e => set(k, e.target.value)} placeholder="0.000" />
+              </div>
+            ))}
             <div className="form-group">
               <label>합계 (톤)</label>
               <input type="text" readOnly value={totalW.toFixed(3)} />
@@ -174,7 +304,8 @@ export default function DailyPage({ recordDate, record, workers, attMap, setting
             {[['chip_3l','3L',sub3],['chip_5l','5L',sub5],['chip_20l','20L',sub20],['chip_120l','120L',sub120]].map(([k,lbl,sub]) => (
               <div className="form-group" key={k}>
                 <label>{lbl} 개수</label>
-                <input type="number" min="0" value={form[k]} onChange={e => set(k, e.target.value)} />
+                <input type="number" min="0" value={form[k]}
+                  onChange={e => set(k, e.target.value)} />
                 <span style={{fontSize:'12px',color:'#6b7280'}}>소계: {sub.toLocaleString()} ℓ</span>
               </div>
             ))}
@@ -195,11 +326,16 @@ export default function DailyPage({ recordDate, record, workers, attMap, setting
                   <span className="att-pos">{w.position}</span>
                   <div className="att-options">
                     {[['1.0','전일','full'],['0.5','반일','half'],['0.0','미출','zero']].map(([val,lbl,cls]) => (
-                      <label key={val} className={`att-option ${cls}`} style={{display:'flex',flexDirection:'column',alignItems:'center',cursor:'pointer',gap:'2px'}}>
+                      <label key={val} className={`att-option ${cls}`}
+                        style={{display:'flex',flexDirection:'column',alignItems:'center',cursor:'pointer',gap:'2px'}}>
                         <input type="radio" name={`att_${w.id}`}
                           checked={String(att[w.id]) === val}
                           onChange={() => setAtt(a => ({...a, [w.id]: parseFloat(val)}))} />
-                        <span style={{padding:'6px 12px',border:'2px solid',borderColor:att[w.id]==parseFloat(val)?'var(--blue)':'var(--gray2)',borderRadius:'6px',fontWeight:'700',background:att[w.id]==parseFloat(val)?'#dbeafe':'transparent',minWidth:'52px',textAlign:'center'}}>{lbl}</span>
+                        <span style={{padding:'6px 12px',border:'2px solid',
+                          borderColor: att[w.id]===parseFloat(val)?'var(--blue)':'var(--gray2)',
+                          borderRadius:'6px',fontWeight:'700',
+                          background: att[w.id]===parseFloat(val)?'#dbeafe':'transparent',
+                          minWidth:'52px',textAlign:'center'}}>{lbl}</span>
                       </label>
                     ))}
                   </div>
@@ -213,7 +349,8 @@ export default function DailyPage({ recordDate, record, workers, attMap, setting
         <div className="card">
           <h2>비고</h2>
           <div className="form-group">
-            <textarea value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="특이사항 입력..." rows={3} />
+            <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
+              placeholder="특이사항 입력..." rows={3} />
           </div>
         </div>
 

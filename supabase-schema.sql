@@ -15,17 +15,24 @@ CREATE TABLE IF NOT EXISTS records (
   chip_5l        INT DEFAULT 0,
   chip_20l       INT DEFAULT 0,
   chip_120l      INT DEFAULT 0,
+  start_km       NUMERIC(10,3),
+  end_km         NUMERIC(10,3),
+  fuel           NUMERIC(6,1),
   notes          TEXT,
   created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS workers (
-  id         SERIAL PRIMARY KEY,
-  name       TEXT NOT NULL,
-  position   TEXT DEFAULT '수거원',
-  dob        TEXT,
-  sort_order INT DEFAULT 0,
-  active     BOOLEAN DEFAULT TRUE
+  id             SERIAL PRIMARY KEY,
+  name           TEXT NOT NULL,
+  position       TEXT DEFAULT '수거원',
+  dob            TEXT,
+  sort_order     INT DEFAULT 0,
+  active         BOOLEAN DEFAULT TRUE,
+  monthly_salary INT DEFAULT 0,
+  bank_name      TEXT DEFAULT '',
+  bank_account   TEXT DEFAULT '',
+  phone          TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS attendance (

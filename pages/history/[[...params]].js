@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import supabase from '../../lib/supabase';
+import { requireAuth, getRole } from '../../lib/auth';
 
 function getPeriod(year, month, startDay) {
   const sd = parseInt(startDay) || 1;
@@ -17,67 +18,117 @@ function getPeriod(year, month, startDay) {
   return { ps, pe, lastDay };
 }
 
-export async function getServerSideProps({ params }) {
-  const p = params?.params || [];
+export async function getServerSideProps({ req, params }) {
+  const authRedirect = requireAuth(req, true);
+  if (authRedirect) return authRedirect;
+
+  const role = getRole(req);
+  const p    = params?.params || [];
   const today = new Date();
   const year  = parseInt(p[0]) || today.getFullYear();
   const month = parseInt(p[1]) || today.getMonth() + 1;
+  const contractIdParam = p[2] ? parseInt(p[2]) : null;
 
-  const setRes = await supabase.from('settings').select('*');
-  const settings = {};
+  const [setRes, contRes] = await Promise.all([
+    supabase.from('settings').select('*'),
+    supabase.from('contracts').select('*').eq('active', true).order('sort_order').order('id'),
+  ]);
+  const settings  = {};
   (setRes.data || []).forEach(r => { settings[r.key] = r.value; });
+  const contracts = contRes.data || [];
+
+  // 계약이 없으면 빈 페이지
+  if (contracts.length === 0) {
+    return { props: { role, records: [], year, month, ps:'', pe:'', lastDay:0, settings, contracts: [], contractId: null, contract: null } };
+  }
+
+  // contractId 없으면 첫 번째 계약으로 리다이렉트
+  if (!contractIdParam) {
+    return { redirect: { destination: `/history/${year}/${month}/${contracts[0].id}`, permanent: false } };
+  }
+
+  const contractId = contractIdParam;
+  const contract   = contracts.find(c => c.id === contractId) || contracts[0];
 
   const { ps, pe, lastDay } = getPeriod(year, month, settings.period_start_day);
 
   const { data: records } = await supabase
     .from('records').select('*')
+    .eq('contract_id', contractId)
     .gte('record_date', ps).lte('record_date', pe)
     .order('record_date');
 
   return {
-    props: { records: records || [], year, month, ps, pe, lastDay, settings },
+    props: { role, records: records || [], year, month, ps, pe, lastDay, settings, contracts, contractId, contract },
   };
 }
 
-export default function HistoryPage({ records, year, month, ps, pe, lastDay, settings }) {
-  const router = useRouter();
-  const totalW  = records.reduce((s,r) => s + (r.weight_1||0) + (r.weight_2||0) + (r.weight_3||0), 0);
-  const total3l = records.reduce((s,r) => s + (r.chip_3l||0), 0);
-  const total5l = records.reduce((s,r) => s + (r.chip_5l||0), 0);
-  const total20l= records.reduce((s,r) => s + (r.chip_20l||0), 0);
-  const total120l=records.reduce((s,r) => s + (r.chip_120l||0), 0);
-  const chipL   = total3l*3 + total5l*5 + total20l*20 + total120l*120;
+export default function HistoryPage({ role, records, year, month, ps, pe, lastDay, settings, contracts, contractId, contract }) {
+  const router   = useRouter();
+  const totalW   = records.reduce((s,r) => s + (r.weight_1||0) + (r.weight_2||0) + (r.weight_3||0), 0);
+  const total3l  = records.reduce((s,r) => s + (r.chip_3l||0), 0);
+  const total5l  = records.reduce((s,r) => s + (r.chip_5l||0), 0);
+  const total20l = records.reduce((s,r) => s + (r.chip_20l||0), 0);
+  const total120l= records.reduce((s,r) => s + (r.chip_120l||0), 0);
+  const chipL    = total3l*3 + total5l*5 + total20l*20 + total120l*120;
 
   const pm = month===1?12:month-1, py=month===1?year-1:year;
   const nm = month===12?1:month+1, ny=month===12?year+1:year;
 
-  const unitPrice = parseFloat(settings.unit_price) || 0;
-  const totalAmt  = totalW * unitPrice;
+  const unitPrice = parseFloat(contract?.unit_price) || parseFloat(settings.unit_price) || 0;
+  const totalAmt  = Math.floor(totalW * unitPrice / 1000) * 1000;
 
   const handleDelete = async (date) => {
     if (!confirm(`${date} 기록을 삭제하시겠습니까?`)) return;
-    await fetch(`/api/records/${date}`, { method: 'DELETE' });
+    await fetch(`/api/records/${date}?contract_id=${contractId}`, { method: 'DELETE' });
     router.replace(router.asPath);
   };
+
+  if (contracts.length === 0) {
+    return (
+      <>
+        <div className="page-header"><h1>월별 조회</h1></div>
+        <div className="empty">
+          <p>등록된 계약이 없습니다.</p>
+          <Link href="/contracts" className="btn btn-primary">계약 관리</Link>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       <div className="page-header">
         <h1>{year}년 {month}월 수거 기록</h1>
         <div className="btn-group">
-          <Link href={`/report/${year}/${month}`} className="btn btn-success" target="_blank">보고서 출력</Link>
+          <Link href={`/report/${year}/${month}`} className="btn btn-success">보고서 출력</Link>
           <Link href={`/daily/${new Date().toISOString().slice(0,10)}`} className="btn btn-outline">오늘 입력</Link>
         </div>
       </div>
 
+      {/* 계약 탭 */}
+      {contracts.length > 1 && (
+        <div style={{display:'flex',gap:'8px',marginBottom:'16px',flexWrap:'wrap'}}>
+          {contracts.map(c => (
+            <Link key={c.id} href={`/history/${year}/${month}/${c.id}`}
+              className={`btn btn-sm ${c.id === contractId ? 'btn-primary' : 'btn-outline'}`}>
+              {c.area || c.name}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* 월 이동 */}
       <div className="month-nav">
-        <Link href={`/history/${py}/${pm}`} className="btn btn-outline btn-sm">← 이전달</Link>
+        <Link href={`/history/${py}/${pm}/${contractId}`} className="btn btn-outline btn-sm">← 이전달</Link>
         <span className="current">{year}년 {String(month).padStart(2,'0')}월</span>
-        <Link href={`/history/${ny}/${nm}`} className="btn btn-outline btn-sm">다음달 →</Link>
+        <Link href={`/history/${ny}/${nm}/${contractId}`} className="btn btn-outline btn-sm">다음달 →</Link>
       </div>
       <p style={{textAlign:'center',fontSize:'13px',color:'#9ca3af',marginBottom:'16px'}}>
         기간: {ps} ~ {pe}
+        {contracts.length > 1 && contract && (
+          <span style={{marginLeft:'12px',color:'#2563eb',fontWeight:'600'}}>{contract.area || contract.name}</span>
+        )}
       </p>
 
       {/* 요약 */}
@@ -98,7 +149,7 @@ export default function HistoryPage({ records, year, month, ps, pe, lastDay, set
         </div>
         <div className="summary-card">
           <div className="s-label">청구 예정액</div>
-          <div className="s-value">{Math.round(totalAmt).toLocaleString()}</div>
+          <div className="s-value">{totalAmt.toLocaleString()}</div>
           <div className="s-sub">원</div>
         </div>
       </div>
@@ -107,7 +158,8 @@ export default function HistoryPage({ records, year, month, ps, pe, lastDay, set
       {records.length === 0 ? (
         <div className="empty">
           <p>이 달에 입력된 기록이 없습니다.</p>
-          <Link href={`/daily/${new Date().toISOString().slice(0,10)}`} className="btn btn-primary">첫 기록 입력</Link>
+          <Link href={`/daily/${new Date().toISOString().slice(0,10)}/${contractId}`}
+            className="btn btn-primary">첫 기록 입력</Link>
         </div>
       ) : (
         <div className="table-wrap">
@@ -116,7 +168,7 @@ export default function HistoryPage({ records, year, month, ps, pe, lastDay, set
               <tr>
                 <th>날짜</th><th>1차(톤)</th><th>2차(톤)</th><th>3차(톤)</th><th>합계(톤)</th>
                 <th>3L</th><th>5L</th><th>20L</th><th>120L</th><th>칩합계(ℓ)</th>
-                <th>횟수</th><th>관리</th>
+                <th>횟수</th><th>출력</th><th>관리</th>
               </tr>
             </thead>
             <tbody>
@@ -137,9 +189,16 @@ export default function HistoryPage({ records, year, month, ps, pe, lastDay, set
                     <td className="num">{cl.toLocaleString()}</td>
                     <td className="num">{r.trips||1}</td>
                     <td>
+                      <a href={`/log/${r.record_date}?contract=${contractId}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="btn btn-outline btn-sm">🖨</a>
+                    </td>
+                    <td>
                       <div style={{display:'flex',gap:'4px',justifyContent:'center'}}>
-                        <Link href={`/daily/${r.record_date}`} className="btn btn-outline btn-sm">수정</Link>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.record_date)}>삭제</button>
+                        <Link href={`/daily/${r.record_date}/${contractId}`}
+                          className="btn btn-outline btn-sm">수정</Link>
+                        <button className="btn btn-danger btn-sm"
+                          onClick={() => handleDelete(r.record_date)}>삭제</button>
                       </div>
                     </td>
                   </tr>
@@ -151,12 +210,10 @@ export default function HistoryPage({ records, year, month, ps, pe, lastDay, set
                 <td>합 계</td>
                 <td className="num">-</td><td className="num">-</td><td className="num">-</td>
                 <td className="num bold">{totalW.toFixed(3)}</td>
-                <td className="num">{total3l}</td>
-                <td className="num">{total5l}</td>
-                <td className="num">{total20l}</td>
-                <td className="num">{total120l}</td>
+                <td className="num">{total3l}</td><td className="num">{total5l}</td>
+                <td className="num">{total20l}</td><td className="num">{total120l}</td>
                 <td className="num">{chipL.toLocaleString()}</td>
-                <td></td><td></td>
+                <td></td><td></td><td></td>
               </tr>
             </tfoot>
           </table>

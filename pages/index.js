@@ -1,11 +1,14 @@
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { requireAuth, getRole } from '../lib/auth';
+
+export async function getServerSideProps({ req }) {
+  const authRedirect = requireAuth(req, false);
+  if (authRedirect) return authRedirect;
+
+  const role = getRole(req);
+  const today = new Date().toISOString().slice(0, 10);
+  return { redirect: { destination: `/daily/${today}`, permanent: false } };
+}
 
 export default function Home() {
-  const router = useRouter();
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    router.replace(`/daily/${today}`);
-  }, []);
   return null;
 }
