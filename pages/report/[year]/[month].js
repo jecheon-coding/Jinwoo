@@ -5,16 +5,18 @@ import { requireAuth, getRole } from '../../../lib/auth';
 
 function getPeriod(year, month, startDay) {
   const sd = parseInt(startDay) || 1;
-  let psDate;
+  const pad = n => String(n).padStart(2, '0');
+  let ps;
   if (sd <= 1) {
-    psDate = new Date(year, month - 1, 1);
+    ps = `${year}-${pad(month)}-01`;
   } else {
-    psDate = month === 1
-      ? new Date(year - 1, 11, sd)
-      : new Date(year, month - 2, sd);
+    const pm = month === 1 ? 12 : month - 1;
+    const py = month === 1 ? year - 1 : year;
+    ps = `${py}-${pad(pm)}-${pad(sd)}`;
   }
-  const peDate = new Date(year, month, 0);
-  return { psDate, peDate };
+  const lastDay = new Date(year, month, 0).getDate();
+  const pe = `${year}-${pad(month)}-${pad(lastDay)}`;
+  return { ps, pe };
 }
 
 export async function getServerSideProps({ req, params, query }) {
@@ -35,9 +37,7 @@ export async function getServerSideProps({ req, params, query }) {
   const contracts = contRes.data || [];
 
   const startDay  = sdParam ?? parseInt(settings.period_start_day) ?? 1;
-  const { psDate, peDate } = getPeriod(year, month, startDay);
-  const ps = psDate.toISOString().slice(0, 10);
-  const pe = peDate.toISOString().slice(0, 10);
+  const { ps, pe } = getPeriod(year, month, startDay);
 
   // 계약별 요약 집계
   const recRes = await supabase
@@ -63,7 +63,7 @@ export default function ReportMenuPage({ role, year, month, ps, pe, contracts, c
   const router   = useRouter();
   const monthPad = String(month).padStart(2, '0');
   const base     = `/report/${year}/${month}`;
-  const sdQuery  = startDay > 1 ? `&sd=${startDay}` : '';
+  const sdQuery  = `&sd=${startDay}`;
 
   if (contracts.length === 0) {
     return (
@@ -87,7 +87,7 @@ export default function ReportMenuPage({ role, year, month, ps, pe, contracts, c
       <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px',flexWrap:'wrap'}}>
         <span style={{fontSize:'13px',color:'#9ca3af'}}>기간: {ps} ~ {pe}</span>
         <span style={{display:'inline-flex',gap:'4px'}}>
-          <Link href={`/report/${year}/${month}`}
+          <Link href={`/report/${year}/${month}?sd=1`}
             className={`btn btn-sm ${startDay <= 1 ? 'btn-primary' : 'btn-outline'}`}>1일~말일</Link>
           <Link href={`/report/${year}/${month}?sd=25`}
             className={`btn btn-sm ${startDay > 1 ? 'btn-primary' : 'btn-outline'}`}>25일~말일</Link>
@@ -136,9 +136,12 @@ export default function ReportMenuPage({ role, year, month, ps, pe, contracts, c
               </div>
             </div>
 
-            <div style={{textAlign:'center'}}>
+            <div style={{display:'flex',gap:'8px',justifyContent:'center',flexWrap:'wrap'}}>
               <Link href={`${base}/all${cq}`} className="btn btn-outline btn-sm">
                 전체 9장 한번에 출력
+              </Link>
+              <Link href={`${base}/claim${cq}`} className="btn btn-outline btn-sm">
+                📎 대금청구서 (공문서)
               </Link>
             </div>
           </div>

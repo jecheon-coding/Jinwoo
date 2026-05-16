@@ -198,8 +198,7 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
     router.push(`/daily/${form.record_date}/${newCid}`);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const doSave = async (redirectTo) => {
     setSaving(true);
     const attendance = workers.map(w => ({ worker_id: w.id, value: att[w.id] ?? 0 }));
     const body = { ...form, attendance };
@@ -213,10 +212,18 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
       body: JSON.stringify(body),
     });
     setSaving(false);
-    if (res.ok) {
-      const d = form.record_date;
-      router.push(`/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}/${contractId}`);
-    }
+    if (res.ok) router.push(redirectTo);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const d = form.record_date;
+    doSave(`/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}/${contractId}`);
+  };
+
+  const handleSaveAndPrint = (e) => {
+    e.preventDefault();
+    doSave(`/log/${form.record_date}?contract=${contractId}`);
   };
 
   const handleDelete = async () => {
@@ -444,6 +451,10 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
         <div className="form-actions">
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? '저장 중...' : record ? '수정 저장' : '저장'}
+          </button>
+          <button type="button" className="btn btn-success" disabled={saving}
+            onClick={handleSaveAndPrint}>
+            {saving ? '저장 중...' : '🖨 저장 후 출력'}
           </button>
           <button type="button" className="btn btn-outline" onClick={() => router.back()}>취소</button>
         </div>

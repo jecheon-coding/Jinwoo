@@ -5,23 +5,29 @@ ReportPrintPage.noLayout = true;
 
 function getPeriod(year, month, startDay) {
   const sd = parseInt(startDay) || 1;
-  let psDate;
+  const pad = n => String(n).padStart(2, '0');
+  let ps;
   if (sd <= 1) {
-    psDate = new Date(year, month - 1, 1);
+    ps = `${year}-${pad(month)}-01`;
   } else {
-    psDate = month === 1
-      ? new Date(year - 1, 11, sd)
-      : new Date(year, month - 2, sd);
+    const pm = month === 1 ? 12 : month - 1;
+    const py = month === 1 ? year - 1 : year;
+    ps = `${py}-${pad(pm)}-${pad(sd)}`;
   }
-  const peDate = new Date(year, month, 0);
-  return { psDate, peDate };
+  const lastDay = new Date(year, month, 0).getDate();
+  const pe = `${year}-${pad(month)}-${pad(lastDay)}`;
+  return { ps, pe };
 }
 
 function dateRange(start, end) {
   const dates = [];
-  const cur = new Date(start);
-  while (cur <= end) {
-    dates.push(cur.toISOString().slice(0, 10));
+  const cur = new Date(start + 'T00:00:00');
+  const endDate = new Date(end + 'T00:00:00');
+  while (cur <= endDate) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    dates.push(`${y}-${m}-${d}`);
     cur.setDate(cur.getDate() + 1);
   }
   return dates;
@@ -71,6 +77,7 @@ export async function getServerSideProps({ req, params, query }) {
   const month      = parseInt(params.month);
   const contractId = query.contract ? parseInt(query.contract) : null;
   const sdParam    = query.sd ? parseInt(query.sd) : null;
+  const sheetParam = query.sheet ? parseInt(query.sheet) : null;
 
   const [setRes, wRes, contRes] = await Promise.all([
     supabase.from('settings').select('*'),
@@ -88,9 +95,7 @@ export async function getServerSideProps({ req, params, query }) {
     : (Array.isArray(contRes.data) ? contRes.data[0] : contRes.data) || null;
 
   const startDay = sdParam ?? parseInt(settings.period_start_day) ?? 1;
-  const { psDate, peDate } = getPeriod(year, month, startDay);
-  const ps = psDate.toISOString().slice(0, 10);
-  const pe = peDate.toISOString().slice(0, 10);
+  const { ps, pe } = getPeriod(year, month, startDay);
 
   let recQ = supabase.from('records').select('*').gte('record_date', ps).lte('record_date', pe).order('record_date');
   let attQ = supabase.from('attendance').select('*').gte('record_date', ps).lte('record_date', pe);
@@ -109,7 +114,7 @@ export async function getServerSideProps({ req, params, query }) {
   const attMap = {};
   (attRes.data || []).forEach(a => { attMap[`${a.record_date}_${a.worker_id}`] = a.value; });
 
-  const dates = dateRange(psDate, peDate);
+  const dates = dateRange(ps, pe);
 
   const totalW    = records.reduce((s, r) => s + (parseFloat(r.weight_1) || 0) + (parseFloat(r.weight_2) || 0) + (parseFloat(r.weight_3) || 0), 0);
   const total3l   = records.reduce((s, r) => s + (parseInt(r.chip_3l)   || 0), 0);
@@ -119,11 +124,12 @@ export async function getServerSideProps({ req, params, query }) {
   const unitPrice  = parseFloat(contract?.unit_price) || parseFloat(settings.unit_price) || 0;
   const billingAmt = Math.floor(totalW * unitPrice / 1000) * 1000;
   const totalSalary = workers.reduce((s, w) => s + (parseInt(w.monthly_salary) || 0), 0);
-  const peLastDay = peDate.getDate();
+  const peLastDay = parseInt(pe.slice(8, 10));
 
   return {
     props: {
-      type,
+      type, sheet: sheetParam,
+      contractId: contractId || null, startDay,
       year, month, ps, pe, peLastDay,
       settings, contract: contract || {}, workers, records, recMap, attMap, dates,
       totalW, total3l, total5l, total20l, total120l,
@@ -133,7 +139,8 @@ export async function getServerSideProps({ req, params, query }) {
 }
 
 export default function ReportPrintPage({
-  type,
+  type, sheet,
+  contractId, startDay,
   year, month, ps, pe, peLastDay,
   settings, contract, workers, records, recMap, attMap, dates,
   totalW, total3l, total5l, total20l, total120l,
@@ -160,16 +167,49 @@ export default function ReportPrintPage({
 
   const typeLabel = type === 'work' ? '근무현황 보고서' : type === 'billing' ? '기성/청구 서류' : '전체 보고서';
 
+  const showSheet = (n) => type !== 'work' || !sheet || sheet === n;
+
+  const sheetUrl = (n) => {
+    const p = [];
+    if (contractId) p.push(`contract=${contractId}`);
+    if (startDay > 1) p.push(`sd=${startDay}`);
+    if (n) p.push(`sheet=${n}`);
+    return `/report/${year}/${month}/work${p.length ? '?' + p.join('&') : ''}`;
+  };
+
+  const billingSheetUrl = (n) => {
+    const p = [];
+    if (contractId) p.push(`contract=${contractId}`);
+    if (startDay > 1) p.push(`sd=${startDay}`);
+    if (n) p.push(`sheet=${n}`);
+    return `/report/${year}/${month}/billing${p.length ? '?' + p.join('&') : ''}`;
+  };
+  const claimUrl = (() => {
+    const p = [];
+    if (contractId) p.push(`contract=${contractId}`);
+    if (startDay > 1) p.push(`sd=${startDay}`);
+    return `/report/${year}/${month}/claim${p.length ? '?' + p.join('&') : ''}`;
+  })();
+  const showBillingSheet = (n) => type !== 'billing' || !sheet || sheet === n;
+
   const css = `
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: '맑은 고딕','Malgun Gothic',sans-serif; font-size: 10pt; color: #000; }
-    .print-btn { position: fixed; top: 16px; right: 16px; background: #2563eb; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-    .back-btn { position: fixed; top: 16px; left: 16px; background: #fff; color: #374151; border: 1px solid #d1d5db; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    @media print { .back-btn { display: none !important; } }
+    .top-bar { position: fixed; top: 0; left: 0; right: 0; height: 48px; background: #1f2937; display: flex; align-items: center; justify-content: space-between; padding: 0 80px; z-index: 100; gap: 12px; }
+    .top-bar-left  { display: flex; gap: 6px; }
+    .top-bar-center { display: flex; gap: 5px; flex: 1; justify-content: center; }
+    .top-bar-right { display: flex; gap: 6px; }
+    .bar-btn { padding: 6px 14px; border-radius: 5px; font-size: 13px; cursor: pointer; border: 1px solid #4b5563; background: #374151; color: #e5e7eb; text-decoration: none; white-space: nowrap; }
+    .bar-btn:hover { background: #4b5563; }
+    .bar-btn-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+    .bar-btn-primary:hover { background: #1d4ed8; }
+    .sheet-tab { padding: 5px 12px; border-radius: 4px; font-size: 12px; text-decoration: none; color: #9ca3af; border: 1px solid #4b5563; white-space: nowrap; }
+    .sheet-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    @media print { .top-bar { display: none !important; } body { padding-top: 0 !important; } }
 
     @media screen {
-      body { background: #6b7280; padding: 20px 0; }
-      .page, .page-land {
+      body { background: #6b7280; padding-top: 64px; padding-bottom: 20px; }
+      .page, .page-land, .page-doc {
         background: #fff;
         box-shadow: 0 4px 16px rgba(0,0,0,0.35);
         margin-bottom: 24px !important;
@@ -188,37 +228,44 @@ export default function ReportPrintPage({
       body { background: #fff; }
       .print-btn { display: none !important; }
       .page-label { display: none !important; }
-      @page { size: A4; margin: 0; }
+      @page { size: ${sheet === 3 ? 'A4 landscape' : 'A4'}; margin: 0; }
     }
 
     .page {
       width: 210mm; min-height: 297mm;
-      margin: 0 auto; padding: 15mm 14mm;
+      margin: 0 auto; padding: 10mm 20mm;
       page-break-after: always;
     }
     .page:last-child { page-break-after: auto; }
 
+    .page-doc {
+      width: 210mm; height: 297mm;
+      margin: 0 auto; padding: 15mm 25mm 12mm;
+      page-break-after: always; overflow: hidden;
+    }
+    .page-doc:last-child { page-break-after: auto; }
+
     .page-land {
       width: 297mm; min-height: 210mm;
-      margin: 0 auto; padding: 12mm 10mm;
+      margin: 0 auto; padding: 25mm 20mm 10mm;
       page-break-after: always;
     }
 
     h2.report-title { text-align: center; font-size: 16pt; font-weight: bold; letter-spacing: 4px; margin-bottom: 8mm; border-bottom: 2px solid #000; padding-bottom: 3mm; }
     table.rt { width: 100%; border-collapse: collapse; font-size: 9pt; }
-    table.rt th { background: #333; color: #fff; padding: 3px 4px; text-align: center; border: 1px solid #555; }
-    table.rt td { border: 1px solid #ccc; padding: 3px 4px; text-align: center; }
-    table.rt tfoot td { background: #f0f0f0; font-weight: bold; border: 1px solid #888; }
+    table.rt th { background: #e5e7eb; color: #111; padding: 5px 6px; text-align: center; border: 1px solid #888; }
+    table.rt td { border: 1px solid #888; padding: 5px 6px; text-align: center; }
+    table.rt tfoot td { background: #f0f0f0; font-weight: bold; border: 1px solid #666; padding: 5px 6px; }
     table.rt td.r { text-align: right; }
     table.rt td.l { text-align: left; }
     .att-table { font-size: 7.5pt; }
-    .att-table th, .att-table td { padding: 2px 3px; }
+    .att-table th, .att-table td { padding: 20px 3px; text-align: center; }
     .sun { color: #dc2626; }
 
     .doc-title { text-align: center; font-size: 20pt; font-weight: bold; letter-spacing: 10px; margin-bottom: 10mm; }
     .doc-list { margin: 2mm 0 4mm 0; list-style: none; }
-    .doc-list li { line-height: 2.4; font-size: 10.5pt; }
-    .doc-list li .lbl { display: inline-block; min-width: 42mm; font-weight: bold; }
+    .doc-list li { display: flex; align-items: baseline; line-height: 2.4; font-size: 10.5pt; }
+    .doc-list li .lbl { flex: 0 0 42mm; font-weight: bold; }
     .doc-center { text-align: center; font-weight: bold; font-size: 12pt; margin: 5mm 0; }
     .doc-body { text-align: center; font-size: 10.5pt; margin: 4mm 0; }
     .doc-sub { font-size: 10pt; margin: 2mm 0 1mm; font-weight: bold; }
@@ -247,18 +294,52 @@ export default function ReportPrintPage({
     <>
       <style dangerouslySetInnerHTML={{ __html: css }} />
 
-      <button className="print-btn" onClick={() => window.print()}>🖨 인쇄</button>
-      <button className="back-btn" onClick={() => window.history.back()}>← 뒤로</button>
+      <div className="top-bar">
+        <div className="top-bar-left">
+          <button className="bar-btn" onClick={() => window.history.back()}>← 뒤로</button>
+          <a className="bar-btn" href="/">홈</a>
+        </div>
+        <div className="top-bar-center">
+          {type === 'work' && (<>
+            <a href={sheetUrl(null)} className={`sheet-tab${!sheet ? ' active' : ''}`}>전체</a>
+            <a href={sheetUrl(1)} className={`sheet-tab${sheet === 1 ? ' active' : ''}`}>계근현황</a>
+            <a href={sheetUrl(2)} className={`sheet-tab${sheet === 2 ? ' active' : ''}`}>칩수거현황</a>
+            <a href={sheetUrl(3)} className={`sheet-tab${sheet === 3 ? ' active' : ''}`}>일일근무현황</a>
+            <a href={sheetUrl(4)} className={`sheet-tab${sheet === 4 ? ' active' : ''}`}>근무확인서</a>
+            <button className="bar-btn bar-btn-primary" onClick={() => window.print()}>🖨 인쇄</button>
+          </>)}
+          {type === 'billing' && (<>
+            <a href={billingSheetUrl(null)} className={`sheet-tab${!sheet ? ' active' : ''}`}>전체</a>
+            <a href={claimUrl} className="sheet-tab">대금청구서</a>
+            <a href={billingSheetUrl(1)} className={`sheet-tab${sheet === 1 ? ' active' : ''}`}>기성부분검사원</a>
+            <a href={billingSheetUrl(2)} className={`sheet-tab${sheet === 2 ? ' active' : ''}`}>기성계</a>
+            <a href={billingSheetUrl(3)} className={`sheet-tab${sheet === 3 ? ' active' : ''}`}>노무비청구</a>
+            <a href={billingSheetUrl(4)} className={`sheet-tab${sheet === 4 ? ' active' : ''}`}>노무비지급</a>
+            <button className="bar-btn bar-btn-primary" onClick={() => window.print()}>🖨 인쇄</button>
+          </>)}
+          {type === 'all' && (
+            <button className="bar-btn bar-btn-primary" onClick={() => window.print()}>🖨 인쇄</button>
+          )}
+        </div>
+        <div className="top-bar-right"></div>
+      </div>
 
       {/* ══ 근무현황 그룹 ══ */}
       {showWork && (
         <>
           {/* 시트 1: 계근현황 */}
-          <span className="page-label">▌ 계근현황</span>
-          <div className="page">
+          {showSheet(1) && <span className="page-label">▌ 계근현황</span>}
+          {showSheet(1) && <div className="page">
             <h2 className="report-title">{monthPad}월 계근현황</h2>
             <p style={{textAlign:'right',fontSize:'9pt',marginBottom:'4mm'}}>기간: {periodLabel}</p>
-            <table className="rt">
+            <table className="rt" style={{tableLayout:'fixed'}}>
+              <colgroup>
+                <col style={{width:'22%'}} />
+                <col style={{width:'19%'}} />
+                <col style={{width:'19%'}} />
+                <col style={{width:'19%'}} />
+                <col style={{width:'21%'}} />
+              </colgroup>
               <thead>
                 <tr>
                   <th rowSpan="2">월 / 일</th>
@@ -270,33 +351,40 @@ export default function ReportPrintPage({
               <tbody>
                 {dates.map(d => {
                   const r = recMap[d];
-                  const wt = r
-                    ? (parseFloat(r.weight_1)||0) + (parseFloat(r.weight_2)||0) + (parseFloat(r.weight_3)||0)
-                    : 0;
+                  const wt = (parseFloat(r?.weight_1)||0) + (parseFloat(r?.weight_2)||0) + (parseFloat(r?.weight_3)||0);
                   return (
                     <tr key={d}>
                       <td>{d.slice(5).replace('-', '월 ')}일</td>
-                      <td className="r">{r ? fmt(r.weight_1) : ''}</td>
-                      <td className="r">{r ? fmt(r.weight_2) : ''}</td>
-                      <td className="r">{r ? fmt(r.weight_3) : ''}</td>
-                      <td className="r" style={{fontWeight:'bold'}}>{r ? wt.toFixed(3) : ''}</td>
+                      <td>{r ? fmt(r.weight_1) : ''}</td>
+                      <td>{r ? fmt(r.weight_2) : ''}</td>
+                      <td>{r ? fmt(r.weight_3) : ''}</td>
+                      <td style={{fontWeight:'bold'}}>{wt.toFixed(3)}</td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
-                <tr>
-                  <td>합 계</td>
-                  <td colSpan="3"></td>
-                  <td className="r">{totalW.toFixed(3)}</td>
-                </tr>
+                {(() => {
+                  const w1 = records.reduce((s,r) => s+(parseFloat(r.weight_1)||0), 0);
+                  const w2 = records.reduce((s,r) => s+(parseFloat(r.weight_2)||0), 0);
+                  const w3 = records.reduce((s,r) => s+(parseFloat(r.weight_3)||0), 0);
+                  return (
+                    <tr>
+                      <td>계</td>
+                      <td>{w1 > 0 ? w1.toFixed(3) : ''}</td>
+                      <td>{w2 > 0 ? w2.toFixed(3) : ''}</td>
+                      <td>{w3 > 0 ? w3.toFixed(3) : ''}</td>
+                      <td>{totalW.toFixed(3)}</td>
+                    </tr>
+                  );
+                })()}
               </tfoot>
             </table>
-          </div>
+          </div>}
 
           {/* 시트 2: 칩수거현황 */}
-          <span className="page-label">▌ 칩수거현황</span>
-          <div className="page">
+          {showSheet(2) && <span className="page-label">▌ 칩수거현황</span>}
+          {showSheet(2) && <div className="page">
             <h2 className="report-title">{monthPad}월 칩수거현황</h2>
             <p style={{textAlign:'right',fontSize:'9pt',marginBottom:'4mm'}}>기간: {periodLabel}</p>
             <table className="rt">
@@ -322,7 +410,7 @@ export default function ReportPrintPage({
                   if (!r) return (
                     <tr key={d}>
                       <td>{d.slice(5).replace('-', '월 ')}일</td>
-                      <td colSpan="9"></td>
+                      <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                   );
                   const s3 = (r.chip_3l||0)*3, s5 = (r.chip_5l||0)*5;
@@ -330,11 +418,11 @@ export default function ReportPrintPage({
                   return (
                     <tr key={d}>
                       <td>{d.slice(5).replace('-', '월 ')}일</td>
-                      <td className="r">{r.chip_3l||0}</td>  <td className="r">{s3.toLocaleString()}</td>
-                      <td className="r">{r.chip_5l||0}</td>  <td className="r">{s5.toLocaleString()}</td>
-                      <td className="r">{r.chip_20l||0}</td> <td className="r">{s20.toLocaleString()}</td>
-                      <td className="r">{r.chip_120l||0}</td><td className="r">{s120.toLocaleString()}</td>
-                      <td className="r" style={{fontWeight:'bold'}}>{(s3+s5+s20+s120).toLocaleString()}</td>
+                      <td>{r.chip_3l||0}</td>  <td>{s3.toLocaleString()}</td>
+                      <td>{r.chip_5l||0}</td>  <td>{s5.toLocaleString()}</td>
+                      <td>{r.chip_20l||0}</td> <td>{s20.toLocaleString()}</td>
+                      <td>{r.chip_120l||0}</td><td>{s120.toLocaleString()}</td>
+                      <td style={{fontWeight:'bold'}}>{(s3+s5+s20+s120).toLocaleString()}</td>
                     </tr>
                   );
                 })}
@@ -342,20 +430,20 @@ export default function ReportPrintPage({
               <tfoot>
                 <tr>
                   <td>합 계</td>
-                  <td className="r">{total3l}</td>  <td className="r">{(total3l*3).toLocaleString()}</td>
-                  <td className="r">{total5l}</td>  <td className="r">{(total5l*5).toLocaleString()}</td>
-                  <td className="r">{total20l}</td> <td className="r">{(total20l*20).toLocaleString()}</td>
-                  <td className="r">{total120l}</td><td className="r">{(total120l*120).toLocaleString()}</td>
-                  <td className="r">{(total3l*3+total5l*5+total20l*20+total120l*120).toLocaleString()}</td>
+                  <td>{total3l}</td>  <td>{(total3l*3).toLocaleString()}</td>
+                  <td>{total5l}</td>  <td>{(total5l*5).toLocaleString()}</td>
+                  <td>{total20l}</td> <td>{(total20l*20).toLocaleString()}</td>
+                  <td>{total120l}</td><td>{(total120l*120).toLocaleString()}</td>
+                  <td>{(total3l*3+total5l*5+total20l*20+total120l*120).toLocaleString()}</td>
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </div>}
 
           {/* 시트 3: 일일 근무현황 (가로) */}
-          <span className="page-label">▌ 일일 근무현황</span>
-          <div className="page-land">
-            <h2 className="report-title">■ {settings.company_name || '진우환경'} 일일 근무현황 ({monthPad}월)</h2>
+          {showSheet(3) && <span className="page-label">▌ 일일 근무현황</span>}
+          {showSheet(3) && <div className="page-land">
+            <h2 className="report-title"> {settings.company_name || '진우환경'} 일일 근무현황 ({monthPad}월)</h2>
             <div style={{overflowX:'auto'}}>
               <table className="rt att-table" style={{tableLayout:'fixed',width:'100%'}}>
                 <thead>
@@ -380,7 +468,7 @@ export default function ReportPrintPage({
                     }, 0);
                     return (
                       <tr key={w.id}>
-                        <td className="l" style={{fontWeight:'bold',paddingLeft:'3px'}}>{w.name}</td>
+                        <td style={{fontWeight:'bold'}}>{w.name}</td>
                         {dates.map(d => {
                           const v = attMap[`${d}_${w.id}`];
                           const dow = new Date(d).getDay();
@@ -395,7 +483,7 @@ export default function ReportPrintPage({
                     );
                   })}
                   <tr style={{borderTop:'2px solid #000'}}>
-                    <td className="l" style={{fontWeight:'bold',fontSize:'7.5pt',paddingLeft:'2px'}}>일 근무인원</td>
+                    <td style={{fontWeight:'bold',fontSize:'7.5pt'}}>일 근무인원</td>
                     {dates.map(d => {
                       const dayTotal = workers.reduce((s, w) => {
                         const v = attMap[`${d}_${w.id}`];
@@ -419,138 +507,106 @@ export default function ReportPrintPage({
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
         </>
       )}
 
       {/* ══ 기성/청구 그룹 ══ */}
       {showBilling && (
         <>
-          {/* 시트 4: 대금청구서 */}
-          <span className="page-label">▌ 대금청구서</span>
-          <div className="page">
-            <div style={{textAlign:'right',fontSize:'9pt',marginBottom:'6mm'}}>
-              {year}년 {monthPad}월분
-            </div>
-            <div className="doc-title">대 금 청 구 서</div>
-            <ul className="doc-list">
-              <li><span className="lbl">수　　　신 :</span> {recipient1 || clientName}</li>
-              <li><span className="lbl">발　　　신 :</span> {settings.company_name} 대표이사 {settings.ceo_name}</li>
-              <li><span className="lbl">제　　　목 :</span> {contractName} 대금청구</li>
-            </ul>
-            <div className="doc-body" style={{marginTop:'6mm'}}>
-              {contractName}에 관하여 아래와 같이 청구합니다.
-            </div>
-            <div className="doc-center">- 아　　래 -</div>
-            <ul className="doc-list">
-              <li><span className="lbl">1. 계 약 건 명 :</span> {contractName}</li>
-              <li><span className="lbl">2. 계 약 번 호 :</span> {contractNumber}</li>
-              <li><span className="lbl">3. 계 약 금 액 :</span> 금 {contractAmt.toLocaleString()}원 ({toKorean(contractAmt)})</li>
-              <li><span className="lbl">4. 이 행 기 간 :</span> {periodLabel}</li>
-              <li><span className="lbl">5. 청 구 금 액 :</span> 금 {billingAmt.toLocaleString()}원 ({toKorean(billingAmt)})</li>
-            </ul>
-            <div className="doc-sub" style={{marginTop:'5mm'}}>6. 청 구 내 역</div>
-            <table className="doc-table">
-              <thead>
-                <tr>
-                  <th>품　　명</th><th>단위</th><th>수량</th>
-                  <th>단가 (원/톤)</th><th>금액 (원)</th><th>비 고</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>음식물류폐기물 수집·운반</td>
-                  <td className="c">톤</td>
-                  <td className="r">{totalW.toFixed(3)}</td>
-                  <td className="r">{unitPrice.toLocaleString()}</td>
-                  <td className="r">{billingAmt.toLocaleString()}</td>
-                  <td className="c">{periodLabel}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="4">합　　계</td>
-                  <td className="r">{billingAmt.toLocaleString()}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-            <ul className="doc-list" style={{marginTop:'4mm'}}>
-              <li>
-                <span className="lbl">7. 입 금 계 좌 :</span>
-                {settings.bank_name} {settings.bank_account}
-                {settings.bank_type ? ` (${settings.bank_type})` : ''}
-                &nbsp; 예금주: {settings.company_name}
-              </li>
-            </ul>
-            <div className="sign-block">
-              <div>{year}년 {month}월 {peLastDay}일</div>
-              <div className="company">{settings.company_name}</div>
-              <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
-            </div>
-          </div>
+          {/* 시트 1: 기성부분검사원 */}
+          {showBillingSheet(1) && <span className="page-label">▌ 기성부분검사원</span>}
+          {showBillingSheet(1) && <div className="page-doc" style={{padding:'10mm 12mm 10mm', display:'flex', flexDirection:'column'}}>{(() => {
+            const fd = (d) => { if(!d) return ''; const p=d.split('-'); return p.length===3?`${p[0]}년 ${p[1]}월 ${p[2]}일`:d; };
+            const b  = {border:'1px solid #000', padding:'5px 8px'};
+            const lb = {...b, fontWeight:'bold', background:'#f5f5f5', textAlign:'center', whiteSpace:'nowrap'};
+            return (<>
+              {/* 외곽 테두리 박스 */}
+              <div style={{border:'2px solid #000', flex:1, display:'flex', flexDirection:'column'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'10pt'}}>
+                  <colgroup>
+                    <col style={{width:'10%'}} /><col style={{width:'18%'}} />
+                    <col style={{width:'36%'}} /><col style={{width:'36%'}} />
+                  </colgroup>
+                  <tbody>
+                    <tr>
+                      <td colSpan="4" style={{...lb, textAlign:'center', fontSize:'15pt', letterSpacing:'8px', padding:'4mm 0', background:'#fff', borderBottom:'1px solid #000', border:'none', borderBottom:'1px solid #000'}}>
+                        기 성 부 분 검 사 원
+                      </td>
+                    </tr>
+                    <tr>
+                      <td rowSpan="2" style={{...lb, writingMode:'vertical-lr', textOrientation:'upright', letterSpacing:'4px', fontSize:'11pt'}}>계약자</td>
+                      <td style={lb}>업 체 명</td>
+                      <td style={b}>{settings.company_name}</td>
+                      <td style={b}><strong>대 표 자</strong>　{settings.ceo_name}</td>
+                    </tr>
+                    <tr>
+                      <td style={lb}>사업장소재지</td>
+                      <td style={b}>{settings.company_addr}</td>
+                      <td style={b}><strong>전화번호</strong>　{settings.company_phone || ''}</td>
+                    </tr>
+                    <tr>
+                      <td style={lb}>용 역 명</td>
+                      <td colSpan="3" style={b}>{contractName}</td>
+                    </tr>
+                    <tr>
+                      <td style={lb}>계 약 금 액</td>
+                      <td style={b}>톤당 : {unitPrice.toLocaleString()}원</td>
+                      <td style={lb}>기성부분<br/>준공금액</td>
+                      <td style={b}>일금 : {billingAmt.toLocaleString()}원<br/>(일금 {toKorean(billingAmt)} 원정)</td>
+                    </tr>
+                    <tr>
+                      <td style={lb}>계 약 일 자</td>
+                      <td style={b}>{fd(contractStart)}</td>
+                      <td style={lb}>착 공 일 자</td>
+                      <td style={b}>{fd(constStart)}</td>
+                    </tr>
+                    <tr>
+                      <td style={lb}>준 공 기 한</td>
+                      <td style={b}>{fd(contractEnd)}</td>
+                      <td style={lb}>준 공 일 지</td>
+                      <td style={b}>{fd(contractEnd)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{...lb, verticalAlign:'top'}}>용역이행사항</td>
+                      <td colSpan="3" style={{...b, lineHeight:'2.2', textAlign:'left'}}>
+                        <div>○ 용역이행기간 : {ps.replace(/-/g,'.')} ~ {pe.replace(/-/g,'.')}.</div>
+                        <div>○ 수집운반량 : {totalW.toFixed(3)}톤</div>
+                        <div>○ 산출기초 : {totalW.toFixed(3)}톤 × {unitPrice.toLocaleString()}원 = {billingAmt.toLocaleString()}원</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
 
-          {/* 시트 5: 기성부분검사원 */}
-          <span className="page-label">▌ 기성부분검사원</span>
-          <div className="page">
-            <div style={{textAlign:'right',fontSize:'9pt',marginBottom:'6mm'}}>
-              {year}년 {monthPad}월분
-            </div>
-            <div className="doc-title">기성부분검사원</div>
-            <ul className="doc-list">
-              <li><span className="lbl">수　　　신 :</span> {recipient2 || clientName}</li>
-              <li><span className="lbl">발　　　신 :</span> {settings.company_name} 대표이사 {settings.ceo_name}</li>
-              <li><span className="lbl">제　　　목 :</span> {contractName} 기성부분 검사 요청</li>
-            </ul>
-            <div className="doc-body" style={{marginTop:'6mm'}}>
-              위 계약에 의한 기성부분을 아래와 같이 검사하여 주시기 바랍니다.
-            </div>
-            <div className="doc-center">- 아　　래 -</div>
-            <ul className="doc-list">
-              <li><span className="lbl">1. 계 약 건 명 :</span> {contractName}</li>
-              <li><span className="lbl">2. 계 약 번 호 :</span> {contractNumber}</li>
-              <li><span className="lbl">3. 계 약 금 액 :</span> 금 {contractAmt.toLocaleString()}원</li>
-              <li><span className="lbl">4. 기 성 기 간 :</span> {periodLabel}</li>
-              <li><span className="lbl">5. 기 성 금 액 :</span> 금 {billingAmt.toLocaleString()}원 ({toKorean(billingAmt)})</li>
-              <li><span className="lbl">6. 착 공 일 자 :</span> {constStart}</li>
-              <li><span className="lbl">7. 기 성 일 자 :</span> {pe}</li>
-            </ul>
-            <div className="doc-sub" style={{marginTop:'5mm'}}>8. 기 성 내 역</div>
-            <table className="doc-table">
-              <thead>
-                <tr>
-                  <th>품　　명</th><th>단위</th><th>수량</th>
-                  <th>단가 (원/톤)</th><th>기성금액 (원)</th><th>비 고</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>음식물류폐기물 수집·운반</td>
-                  <td className="c">톤</td>
-                  <td className="r">{totalW.toFixed(3)}</td>
-                  <td className="r">{unitPrice.toLocaleString()}</td>
-                  <td className="r">{billingAmt.toLocaleString()}</td>
-                  <td className="c">{periodLabel}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="4">합　　계</td>
-                  <td className="r">{billingAmt.toLocaleString()}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-            <div className="sign-block">
-              <div>{year}년 {month}월 {peLastDay}일</div>
-              <div className="company">{settings.company_name}</div>
-              <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
-            </div>
-          </div>
+                {/* 본문 + 서명 영역 (외곽 박스 안) */}
+                <div style={{flex:1, padding:'5mm 8mm', display:'flex', flexDirection:'column'}}>
+                  <div style={{textAlign:'center', fontSize:'10.5pt', lineHeight:'2', marginBottom:'3mm'}}>
+                    위 용역에 대한 과업지시서 및 기타계약조건의 내용과 같이<br/>
+                    기성 되었기에 기성부분검사원을 제출합니다.
+                  </div>
+                  <div style={{textAlign:'center', fontSize:'10.5pt', margin:'3mm 0'}}>
+                    {year}년 {monthPad}월　　　일
+                  </div>
+                  <div style={{textAlign:'right', fontSize:'10.5pt', lineHeight:'2.4', marginTop:'4mm'}}>
+                    <div>업 체 명 : {settings.company_name}</div>
+                    <div>대 표 자 : {settings.ceo_name}　　(인)</div>
+                  </div>
+                  <div style={{fontWeight:'bold', textDecoration:'underline', fontSize:'12pt', marginTop:'auto', paddingTop:'4mm'}}>
+                    {recipient2 || clientName}수&nbsp;&nbsp;귀하
+                  </div>
+                </div>
+              </div>
 
-          {/* 시트 6: 기성계 */}
-          <span className="page-label">▌ 기성계</span>
-          <div className="page">
+              {/* 구비서류 (외곽 박스 아래 별도 영역) */}
+              <div style={{border:'1px solid #000', marginTop:'3mm', padding:'3mm 5mm', fontSize:'10pt'}}>
+                &lt;구비서류&gt;
+              </div>
+            </>);
+          })()}</div>}
+
+          {/* 시트 2: 기성계 */}
+          {showBillingSheet(2) && <span className="page-label">▌ 기성계</span>}
+          {showBillingSheet(2) && <div className="page-doc">
             <div className="doc-title">기　성　계</div>
             <div className="gi-meta">
               <table>
@@ -627,11 +683,11 @@ export default function ReportPrintPage({
               <div className="company">{settings.company_name}</div>
               <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
             </div>
-          </div>
+          </div>}
 
-          {/* 시트 7: 노무비청구내역서 */}
-          <span className="page-label">▌ 노무비청구내역서</span>
-          <div className="page">
+          {/* 시트 3: 노무비청구내역서 */}
+          {showBillingSheet(3) && <span className="page-label">▌ 노무비청구내역서</span>}
+          {showBillingSheet(3) && <div className="page-doc">
             <div style={{textAlign:'right',fontSize:'9pt',marginBottom:'6mm'}}>
               {year}년 {monthPad}월분
             </div>
@@ -693,11 +749,11 @@ export default function ReportPrintPage({
               <div className="company">{settings.company_name}</div>
               <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
             </div>
-          </div>
+          </div>}
 
-          {/* 시트 8: 노무비지급내역서 */}
-          <span className="page-label">▌ 노무비지급내역서</span>
-          <div className="page">
+          {/* 시트 4: 노무비지급내역서 */}
+          {showBillingSheet(4) && <span className="page-label">▌ 노무비지급내역서</span>}
+          {showBillingSheet(4) && <div className="page-doc">
             <div className="doc-title" style={{letterSpacing:'6px'}}>노무비 지급 내역서</div>
             <div style={{textAlign:'center',fontSize:'10pt',marginBottom:'8mm'}}>[ 서 식 3 ]</div>
             <div style={{display:'flex',gap:'10mm',marginBottom:'5mm',fontSize:'9.5pt',flexWrap:'wrap'}}>
@@ -751,15 +807,15 @@ export default function ReportPrintPage({
               <div className="company">{settings.company_name}</div>
               <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
             </div>
-          </div>
+          </div>}
         </>
       )}
 
       {/* ══ 근무확인서 (근무현황 그룹 마지막) ══ */}
       {showWork && (
         <>
-          <span className="page-label">▌ 근무확인서</span>
-          <div className="page">
+          {showSheet(4) && <span className="page-label">▌ 근무확인서</span>}
+          {showSheet(4) && <div className="page" style={{paddingTop:'20mm'}}>
             <h2 className="report-title">근 무 확 인 서</h2>
             <div style={{textAlign:'right',fontSize:'9pt',marginBottom:'5mm'}}>
               {monthPad}월 ({area}) &nbsp; 이행기간: {periodLabel}
@@ -767,23 +823,28 @@ export default function ReportPrintPage({
             <table className="rt">
               <thead>
                 <tr>
-                  <th>성 명</th>
-                  <th>직 위</th>
-                  <th>생년월일</th>
-                  <th>비　고</th>
+                  <th style={{padding:'20px 6px'}}>성 명</th>
+                  <th style={{padding:'20px 6px'}}>직 위</th>
+                  <th style={{padding:'20px 6px'}}>생년월일</th>
+                  <th style={{padding:'20px 6px'}}>비　고</th>
                 </tr>
               </thead>
               <tbody>
                 {workers.map(w => (
                   <tr key={w.id}>
-                    <td style={{fontWeight:'bold'}}>{w.name}</td>
-                    <td>{w.position}</td>
-                    <td>{w.dob}</td>
-                    <td></td>
+                    <td style={{fontWeight:'bold',padding:'20px 6px'}}>{w.name}</td>
+                    <td style={{padding:'20px 6px'}}>{w.position}</td>
+                    <td style={{padding:'20px 6px'}}>{w.dob}</td>
+                    <td style={{padding:'20px 6px'}}></td>
                   </tr>
                 ))}
                 {Array.from({length: Math.max(0, 4 - workers.length)}).map((_, i) => (
-                  <tr key={`emp-${i}`}><td>&nbsp;</td><td></td><td></td><td></td></tr>
+                  <tr key={`emp-${i}`}>
+                    <td style={{padding:'20px 6px'}}>&nbsp;</td>
+                    <td style={{padding:'20px 6px'}}></td>
+                    <td style={{padding:'20px 6px'}}></td>
+                    <td style={{padding:'20px 6px'}}></td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -795,7 +856,7 @@ export default function ReportPrintPage({
               <div className="company">{settings.company_name}</div>
               <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
             </div>
-          </div>
+          </div>}
         </>
       )}
     </>

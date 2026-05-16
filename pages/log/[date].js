@@ -68,7 +68,8 @@ export default function LogPage({ date, record, presentWorkers, settings }) {
     ? fmtKm(Number(r.end_km) - Number(r.start_km)) : '';
   const w1 = r.weight_1 ? Number(r.weight_1).toFixed(3) : '';
   const w2 = r.weight_2 ? Number(r.weight_2).toFixed(3) : '';
-  const workerNames = presentWorkers.map(w => w.name).join(', ');
+  const driverName  = r.driver || settings.driver || '';
+  const workerNames = presentWorkers.filter(w => w.name !== driverName).map(w => w.name).join(', ');
   const area = r.route ? r.route.split('(')[0].split(' ')[0] + ' ~' : '';
 
   const pdfProps = { date, record, presentWorkers, settings };

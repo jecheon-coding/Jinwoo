@@ -67,7 +67,7 @@ export async function getServerSideProps({ req, params, query }) {
 
 export default function HistoryPage({ role, records, year, month, ps, pe, lastDay, settings, contracts, contractId, contract, startDay }) {
   const router   = useRouter();
-  const sdQuery  = startDay > 1 ? `?sd=${startDay}` : '';
+  const sdQuery  = `?sd=${startDay}`;
   const totalW   = records.reduce((s,r) => s + (r.weight_1||0) + (r.weight_2||0) + (r.weight_3||0), 0);
   const total3l  = records.reduce((s,r) => s + (r.chip_3l||0), 0);
   const total5l  = records.reduce((s,r) => s + (r.chip_5l||0), 0);
@@ -133,7 +133,7 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
           <span style={{marginRight:'12px',color:'#2563eb',fontWeight:'600',fontSize:'13px'}}>{contract.area || contract.name}</span>
         )}
         <span style={{display:'inline-flex',gap:'4px'}}>
-          <Link href={`/history/${year}/${month}/${contractId}`}
+          <Link href={`/history/${year}/${month}/${contractId}?sd=1`}
             className={`btn btn-sm ${startDay <= 1 ? 'btn-primary' : 'btn-outline'}`}>1일~말일</Link>
           <Link href={`/history/${year}/${month}/${contractId}?sd=25`}
             className={`btn btn-sm ${startDay > 1 ? 'btn-primary' : 'btn-outline'}`}>25일~말일</Link>
