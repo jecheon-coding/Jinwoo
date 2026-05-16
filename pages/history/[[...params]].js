@@ -129,6 +129,9 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
       </div>
       <div style={{textAlign:'center',marginBottom:'12px'}}>
         <span style={{fontSize:'13px',color:'#9ca3af',marginRight:'12px'}}>기간: {ps} ~ {pe}</span>
+        {contracts.length > 1 && contract && (
+          <span style={{marginRight:'12px',color:'#2563eb',fontWeight:'600',fontSize:'13px'}}>{contract.area || contract.name}</span>
+        )}
         <span style={{display:'inline-flex',gap:'4px'}}>
           <Link href={`/history/${year}/${month}/${contractId}`}
             className={`btn btn-sm ${startDay <= 1 ? 'btn-primary' : 'btn-outline'}`}>1일~말일</Link>
@@ -136,10 +139,6 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
             className={`btn btn-sm ${startDay > 1 ? 'btn-primary' : 'btn-outline'}`}>25일~말일</Link>
         </span>
       </div>
-        {contracts.length > 1 && contract && (
-          <span style={{marginLeft:'12px',color:'#2563eb',fontWeight:'600'}}>{contract.area || contract.name}</span>
-        )}
-      </p>
 
       {/* 요약 */}
       <div className="summary-row">
