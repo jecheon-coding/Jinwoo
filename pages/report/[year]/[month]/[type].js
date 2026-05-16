@@ -70,6 +70,7 @@ export async function getServerSideProps({ req, params, query }) {
   const year       = parseInt(params.year);
   const month      = parseInt(params.month);
   const contractId = query.contract ? parseInt(query.contract) : null;
+  const sdParam    = query.sd ? parseInt(query.sd) : null;
 
   const [setRes, wRes, contRes] = await Promise.all([
     supabase.from('settings').select('*'),
@@ -86,7 +87,8 @@ export async function getServerSideProps({ req, params, query }) {
     ? (contRes.data || null)
     : (Array.isArray(contRes.data) ? contRes.data[0] : contRes.data) || null;
 
-  const { psDate, peDate } = getPeriod(year, month, settings.period_start_day);
+  const startDay = sdParam ?? parseInt(settings.period_start_day) ?? 1;
+  const { psDate, peDate } = getPeriod(year, month, startDay);
   const ps = psDate.toISOString().slice(0, 10);
   const pe = peDate.toISOString().slice(0, 10);
 

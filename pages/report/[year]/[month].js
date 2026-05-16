@@ -17,13 +17,14 @@ function getPeriod(year, month, startDay) {
   return { psDate, peDate };
 }
 
-export async function getServerSideProps({ req, params }) {
+export async function getServerSideProps({ req, params, query }) {
   const authRedirect = requireAuth(req, true);
   if (authRedirect) return authRedirect;
 
   const role  = getRole(req);
   const year  = parseInt(params.year);
   const month = parseInt(params.month);
+  const sdParam = query.sd ? parseInt(query.sd) : null;
 
   const [setRes, contRes] = await Promise.all([
     supabase.from('settings').select('*'),
@@ -33,7 +34,8 @@ export async function getServerSideProps({ req, params }) {
   (setRes.data || []).forEach(r => { settings[r.key] = r.value; });
   const contracts = contRes.data || [];
 
-  const { psDate, peDate } = getPeriod(year, month, settings.period_start_day);
+  const startDay  = sdParam ?? parseInt(settings.period_start_day) ?? 1;
+  const { psDate, peDate } = getPeriod(year, month, startDay);
   const ps = psDate.toISOString().slice(0, 10);
   const pe = peDate.toISOString().slice(0, 10);
 
@@ -53,14 +55,15 @@ export async function getServerSideProps({ req, params }) {
   });
 
   return {
-    props: { role, year, month, ps, pe, contracts, contractStats },
+    props: { role, year, month, ps, pe, contracts, contractStats, startDay },
   };
 }
 
-export default function ReportMenuPage({ role, year, month, ps, pe, contracts, contractStats }) {
+export default function ReportMenuPage({ role, year, month, ps, pe, contracts, contractStats, startDay }) {
   const router   = useRouter();
   const monthPad = String(month).padStart(2, '0');
   const base     = `/report/${year}/${month}`;
+  const sdQuery  = startDay > 1 ? `&sd=${startDay}` : '';
 
   if (contracts.length === 0) {
     return (
@@ -81,13 +84,21 @@ export default function ReportMenuPage({ role, year, month, ps, pe, contracts, c
         <button className="btn btn-outline btn-sm" onClick={() => router.back()}>뒤로</button>
       </div>
 
-      <p style={{fontSize:'13px',color:'#9ca3af',marginBottom:'20px'}}>기간: {ps} ~ {pe}</p>
+      <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px',flexWrap:'wrap'}}>
+        <span style={{fontSize:'13px',color:'#9ca3af'}}>기간: {ps} ~ {pe}</span>
+        <span style={{display:'inline-flex',gap:'4px'}}>
+          <Link href={`/report/${year}/${month}`}
+            className={`btn btn-sm ${startDay <= 1 ? 'btn-primary' : 'btn-outline'}`}>1일~말일</Link>
+          <Link href={`/report/${year}/${month}?sd=25`}
+            className={`btn btn-sm ${startDay > 1 ? 'btn-primary' : 'btn-outline'}`}>25일~말일</Link>
+        </span>
+      </div>
 
       {contracts.map(c => {
         const stats     = contractStats[c.id] || { workDays: 0, totalW: 0 };
         const unitPrice = parseFloat(c.unit_price) || 0;
         const billing   = Math.floor(stats.totalW * unitPrice / 1000) * 1000;
-        const cq = `?contract=${c.id}`;
+        const cq = `?contract=${c.id}${sdQuery}`;
 
         return (
           <div key={c.id} className="card" style={{marginBottom:'16px'}}>

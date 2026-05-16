@@ -18,7 +18,7 @@ function getPeriod(year, month, startDay) {
   return { ps, pe, lastDay };
 }
 
-export async function getServerSideProps({ req, params }) {
+export async function getServerSideProps({ req, params, query }) {
   const authRedirect = requireAuth(req, true);
   if (authRedirect) return authRedirect;
 
@@ -28,6 +28,7 @@ export async function getServerSideProps({ req, params }) {
   const year  = parseInt(p[0]) || today.getFullYear();
   const month = parseInt(p[1]) || today.getMonth() + 1;
   const contractIdParam = p[2] ? parseInt(p[2]) : null;
+  const sdParam = query.sd ? parseInt(query.sd) : null;
 
   const [setRes, contRes] = await Promise.all([
     supabase.from('settings').select('*'),
@@ -39,7 +40,7 @@ export async function getServerSideProps({ req, params }) {
 
   // 계약이 없으면 빈 페이지
   if (contracts.length === 0) {
-    return { props: { role, records: [], year, month, ps:'', pe:'', lastDay:0, settings, contracts: [], contractId: null, contract: null } };
+    return { props: { role, records: [], year, month, ps:'', pe:'', lastDay:0, settings, contracts: [], contractId: null, contract: null, startDay: 1 } };
   }
 
   // contractId 없으면 첫 번째 계약으로 리다이렉트
@@ -49,8 +50,9 @@ export async function getServerSideProps({ req, params }) {
 
   const contractId = contractIdParam;
   const contract   = contracts.find(c => c.id === contractId) || contracts[0];
+  const startDay   = sdParam ?? parseInt(settings.period_start_day) ?? 1;
 
-  const { ps, pe, lastDay } = getPeriod(year, month, settings.period_start_day);
+  const { ps, pe, lastDay } = getPeriod(year, month, startDay);
 
   const { data: records } = await supabase
     .from('records').select('*')
@@ -59,12 +61,13 @@ export async function getServerSideProps({ req, params }) {
     .order('record_date');
 
   return {
-    props: { role, records: records || [], year, month, ps, pe, lastDay, settings, contracts, contractId, contract },
+    props: { role, records: records || [], year, month, ps, pe, lastDay, settings, contracts, contractId, contract, startDay },
   };
 }
 
-export default function HistoryPage({ role, records, year, month, ps, pe, lastDay, settings, contracts, contractId, contract }) {
+export default function HistoryPage({ role, records, year, month, ps, pe, lastDay, settings, contracts, contractId, contract, startDay }) {
   const router   = useRouter();
+  const sdQuery  = startDay > 1 ? `?sd=${startDay}` : '';
   const totalW   = records.reduce((s,r) => s + (r.weight_1||0) + (r.weight_2||0) + (r.weight_3||0), 0);
   const total3l  = records.reduce((s,r) => s + (r.chip_3l||0), 0);
   const total5l  = records.reduce((s,r) => s + (r.chip_5l||0), 0);
@@ -120,12 +123,19 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
 
       {/* 월 이동 */}
       <div className="month-nav">
-        <Link href={`/history/${py}/${pm}/${contractId}`} className="btn btn-outline btn-sm">← 이전달</Link>
+        <Link href={`/history/${py}/${pm}/${contractId}${sdQuery}`} className="btn btn-outline btn-sm">← 이전달</Link>
         <span className="current">{year}년 {String(month).padStart(2,'0')}월</span>
-        <Link href={`/history/${ny}/${nm}/${contractId}`} className="btn btn-outline btn-sm">다음달 →</Link>
+        <Link href={`/history/${ny}/${nm}/${contractId}${sdQuery}`} className="btn btn-outline btn-sm">다음달 →</Link>
       </div>
-      <p style={{textAlign:'center',fontSize:'13px',color:'#9ca3af',marginBottom:'16px'}}>
-        기간: {ps} ~ {pe}
+      <div style={{textAlign:'center',marginBottom:'12px'}}>
+        <span style={{fontSize:'13px',color:'#9ca3af',marginRight:'12px'}}>기간: {ps} ~ {pe}</span>
+        <span style={{display:'inline-flex',gap:'4px'}}>
+          <Link href={`/history/${year}/${month}/${contractId}`}
+            className={`btn btn-sm ${startDay <= 1 ? 'btn-primary' : 'btn-outline'}`}>1일~말일</Link>
+          <Link href={`/history/${year}/${month}/${contractId}?sd=25`}
+            className={`btn btn-sm ${startDay > 1 ? 'btn-primary' : 'btn-outline'}`}>25일~말일</Link>
+        </span>
+      </div>
         {contracts.length > 1 && contract && (
           <span style={{marginLeft:'12px',color:'#2563eb',fontWeight:'600'}}>{contract.area || contract.name}</span>
         )}
