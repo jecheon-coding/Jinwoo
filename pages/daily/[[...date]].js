@@ -50,23 +50,18 @@ export async function getServerSideProps({ req, params, query }) {
   // 계약 ID가 있으면 입력폼
   const contract = contracts.find(c => c.id === contractId) || null;
 
-  const queries = [
+  const [wRes, prevRecRes, attRes, recRes] = await Promise.all([
     supabase.from('workers').select('*').eq('active', true).order('sort_order').order('id'),
     supabase.from('records').select('end_km').lt('record_date', recordDate).eq('contract_id', contractId).order('record_date', { ascending: false }).limit(1).maybeSingle(),
-  ];
-  if (editMode) {
-    queries.push(
-      supabase.from('attendance').select('*').eq('record_date', recordDate).eq('contract_id', contractId),
-      supabase.from('records').select('*').eq('record_date', recordDate).eq('contract_id', contractId).maybeSingle(),
-    );
-  }
-  const [wRes, prevRecRes, attRes, recRes] = await Promise.all(queries);
+    supabase.from('attendance').select('*').eq('record_date', recordDate).eq('contract_id', contractId),
+    supabase.from('records').select('*').eq('record_date', recordDate).eq('contract_id', contractId).maybeSingle(),
+  ]);
 
   let record = recRes?.data || null;
   let attData = attRes?.data || [];
 
-  // 수정 모드에서 레거시 레코드 fallback
-  if (editMode && !record && contractId) {
+  // 레거시 레코드 fallback (contract_id 없는 이전 데이터)
+  if (!record && contractId) {
     const [legacyRec, legacyAtt] = await Promise.all([
       supabase.from('records').select('*').eq('record_date', recordDate).is('contract_id', null).maybeSingle(),
       supabase.from('attendance').select('*').eq('record_date', recordDate).is('contract_id', null),
@@ -148,6 +143,9 @@ export default function DailyPage(props) {
 
 function DailyForm({ role, recordDate, contracts, settings, contract, contractId, record, workers, attMap, prevEndKm, router }) {
   const isSaturday = new Date(recordDate).getDay() === 6;
+  const isUser = role === 'user';
+  const today = new Intl.DateTimeFormat('sv', { timeZone: 'Asia/Seoul' }).format(new Date());
+  const isPastDate = isUser && recordDate < today;
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     record_date:    recordDate,
@@ -245,12 +243,6 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
       <div className="page-header">
         <h1>일일 운행 입력</h1>
         <div className="btn-group">
-          {record && (
-            <Link href={`/log/${form.record_date}?contract=${contractId}`}
-               className="btn btn-outline btn-sm">
-              🖨 일지 출력
-            </Link>
-          )}
           {record && role === 'admin' && (
             <button className="btn btn-danger btn-sm" onClick={handleDelete}>삭제</button>
           )}
@@ -455,15 +447,23 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
         </div>
 
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? '저장 중...' : record ? '수정 저장' : '저장'}
-          </button>
-          <button type="button" className="btn btn-success" disabled={saving}
-            onClick={handleSaveAndPrint}>
-            {saving ? '저장 중...' : '🖨 저장 후 출력'}
-          </button>
-          {role === 'admin' && (
-            <button type="button" className="btn btn-outline" onClick={() => router.back()}>취소</button>
+          {isPastDate ? (
+            <p style={{color:'#9ca3af', fontSize:'14px'}}>오늘 날짜만 입력할 수 있습니다.</p>
+          ) : (
+            <>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? '저장 중...' : record ? '수정 저장' : '저장'}
+              </button>
+              {!isUser && (
+                <button type="button" className="btn btn-success" disabled={saving}
+                  onClick={handleSaveAndPrint}>
+                  {saving ? '저장 중...' : '🖨 저장 후 출력'}
+                </button>
+              )}
+              {role === 'admin' && (
+                <button type="button" className="btn btn-outline" onClick={() => router.back()}>취소</button>
+              )}
+            </>
           )}
         </div>
       </form>

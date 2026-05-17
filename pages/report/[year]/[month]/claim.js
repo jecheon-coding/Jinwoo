@@ -155,7 +155,7 @@ export default function ClaimPage({ year, month, contractId, startDay, settings,
     .req-inner { display: flex; gap: 6mm; }
     .req-label { font-weight: bold; white-space: nowrap; padding-top: 1px; }
     .req-rows  {}
-    .req-row   { display: flex; }
+    .req-row   { display: flex; margin-bottom: 3mm; }
     .req-key   { display: inline-block; min-width: 14mm; font-weight: bold; }
     .recipient { font-size: 12pt; font-weight: bold; margin-top: auto; padding-top: 8mm; }
   `;
@@ -253,7 +253,7 @@ export default function ClaimPage({ year, month, contractId, startDay, settings,
               </div>
               <div className="req-row">
                 <span className="req-key">성　명 :</span>
-                <span>&nbsp;{ceoName}&nbsp;&nbsp;&nbsp;(인)</span>
+                <span>&nbsp;{ceoName.split('').join(' ')}&nbsp;&nbsp;&nbsp;(인)</span>
               </div>
             </div>
           </div>

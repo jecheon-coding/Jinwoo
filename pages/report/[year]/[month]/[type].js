@@ -271,14 +271,30 @@ export default function ReportPrintPage({
     .doc-sub { font-size: 10pt; margin: 2mm 0 1mm; font-weight: bold; }
 
     .doc-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 3mm 0; }
-    .doc-table th { border: 1px solid #000; padding: 4px 6px; text-align: center; background: #e8e8e8; font-weight: bold; }
-    .doc-table td { border: 1px solid #000; padding: 4px 6px; }
+    .doc-table th { border: 1px solid #000; padding: 6px 6px; text-align: center; background: #fff; color: #000; font-weight: bold; }
+    .doc-table td { border: 1px solid #000; padding: 6px 6px; color: #000; }
     .doc-table td.r { text-align: right; }
     .doc-table td.c { text-align: center; }
     .doc-table tfoot td { border: 1px solid #000; padding: 4px 6px; font-weight: bold; background: #f0f0f0; text-align: center; }
     .doc-table tfoot td.r { text-align: right; }
 
     .amount-box { border: 1px solid #000; padding: 3mm 5mm; margin: 4mm 0; font-size: 10pt; line-height: 2; }
+    .req-inner { display: flex; gap: 6mm; font-size: 10.5pt; }
+    .req-label { font-weight: bold; white-space: nowrap; padding-top: 1px; }
+    .req-row   { display: flex; margin-bottom: 3mm; }
+    .req-key   { display: inline-block; min-width: 14mm; font-weight: bold; }
+    .gi-recipient { font-size: 12pt; font-weight: bold; margin-top: auto; padding-top: 8mm; }
+    .gi-items    { list-style: none; margin-bottom: 10mm; }
+    .gi-items li { display: flex; margin-bottom: 5mm; font-size: 10.5pt; line-height: 1.7; }
+    .gi-items li .lbl { flex: 0 0 auto; font-weight: bold; white-space: nowrap; padding-right: 2mm; }
+    .gi-body-text { text-align: center; font-size: 10.5pt; margin: 0mm 0 10mm; letter-spacing: 1px; }
+    .gi-sec-title { font-size: 10pt; font-weight: bold; margin-bottom: 4mm; }
+    .gi-acct-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-bottom: 9mm; }
+    .gi-acct-table th { border: 1px solid #000; padding: 9px 4px; text-align: center; background: #f0f0f0; font-weight: bold; color: #000; }
+    .gi-acct-table td { border: 1px solid #000; padding: 10px 4px; text-align: center; color: #000; }
+    .gi-acct-table td.r { text-align: right; }
+    .gi-date-line { text-align: center; font-size: 10.5pt; margin-bottom: 10mm; }
+    .gi-requester { font-size: 10.5pt; line-height: 2; }
     .sign-block { margin-top: 12mm; text-align: right; font-size: 10.5pt; line-height: 2.4; }
     .sign-block .company { font-size: 12pt; font-weight: bold; }
     .sign-block .ceo { font-size: 10.5pt; }
@@ -523,62 +539,70 @@ export default function ReportPrintPage({
               return (<>
                 {/* 외곽 테두리 박스 */}
                 <div style={{border:'1px solid #000', flex:1, display:'flex', flexDirection:'column'}}>
+                  {/* 테이블 1: 계약자 정보 — colgroup으로 독립 너비 조정 가능 */}
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:'10pt',tableLayout:'fixed'}}>
                     <colgroup>
-                      <col style={{width:'7%'}} /><col style={{width:'15%'}} />
-                      <col style={{width:'31%'}} /><col style={{width:'13%'}} />
-                      <col style={{width:'34%'}} />
+                      <col style={{width:'5%'}} />
+                      <col style={{width:'15%'}} />
+                      <col style={{width:'46%'}} />
+                      <col style={{width:'13%'}} />
+                      <col style={{width:'21%'}} />
                     </colgroup>
                     <tbody>
                       <tr>
-                        {/* 제목 행도 외곽 박스와 겹치지 않도록 테두리 조정 */}
                         <td colSpan="5" style={{...lb, textAlign:'center', fontSize:'15pt', letterSpacing:'8px', padding:'4mm 0', background:'#fff', border:'none', borderBottom:'1px solid #000'}}>
                           기 성 부 분 검 사 원
                         </td>
                       </tr>
                       <tr>
-                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
-                        <td rowSpan="2" style={{...lb, writingMode:'vertical-lr', textOrientation:'upright', letterSpacing:'4px', fontSize:'11pt', borderLeft:'none'}}>계약자</td>
+                        <td rowSpan="2" style={{...lb, writingMode:'vertical-lr', textOrientation:'upright', letterSpacing:'4px', fontSize:'12pt', borderLeft:'none'}}>계약자</td>
                         <td style={lb}>업 체 명</td>
                         <td style={b}>{settings.company_name}</td>
-                        <td colSpan="2" style={b}><strong>대 표 자</strong>　{settings.ceo_name}</td>
+                        <td style={lb}>대 표 자</td>
+                        <td style={{...b, borderRight:'none'}}>{settings.ceo_name}</td>
                       </tr>
                       <tr>
-                        {/* 위에서 rowSpan="2"로 계약자가 첫 열을 차지하므로, 이 행의 첫 셀은 두 번째 열인 '사업장소재지'입니다. 하지만 시각적으로 가장 왼쪽은 아니므로 테두리를 유지합니다. */}
                         <td style={lb}>사업장소재지</td>
                         <td style={b}>{settings.company_addr}</td>
-                        <td colSpan="2" style={b}><strong>전화번호</strong>　{settings.company_phone || ''}</td>
+                        <td style={lb}>전화번호</td>
+                        <td style={{...b, borderRight:'none'}}>{settings.company_tel || ''}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {/* 테이블 2: 계약 내용 — colgroup으로 독립 너비 조정 가능 */}
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'11pt',tableLayout:'fixed',marginTop:'-1px'}}>
+                    <colgroup>
+                      <col style={{width:'20%'}} />
+                      <col style={{width:'30%'}} />
+                      <col style={{width:'16%'}} />
+                      <col style={{width:'34%'}} />
+                    </colgroup>
+                    <tbody>
+                      <tr>
+                        <td style={{...lb, borderLeft:'none'}}>용 역 명</td>
+                        <td colSpan="3" style={{...b, borderRight:'none'}}>{contractName}</td>
                       </tr>
                       <tr>
-                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
-                        <td colSpan="2" style={{...lb, borderLeft:'none'}}>용 역 명</td>
-                        <td colSpan="3" style={b}>{contractName}</td>
-                      </tr>
-                      <tr>
-                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
-                        <td colSpan="2" style={{...lb, borderLeft:'none'}}>계 약 금 액</td>
+                        <td style={{...lb, borderLeft:'none'}}>계 약 금 액</td>
                         <td style={b}>톤당 : {unitPrice.toLocaleString()}원</td>
                         <td style={lb}>기성부분<br/>준공금액</td>
-                        <td style={b}>일금 : {billingAmt.toLocaleString()}원<br/>(일금 {toKorean(billingAmt)} 원정)</td>
+                        <td style={{...b, borderRight:'none'}}>일금 : {billingAmt.toLocaleString()}원<br/>(일금 {toKorean(billingAmt)} 원정)</td>
                       </tr>
                       <tr>
-                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
-                        <td colSpan="2" style={{...lb, borderLeft:'none'}}>계 약 일 자</td>
+                        <td style={{...lb, borderLeft:'none'}}>계 약 일 자</td>
                         <td style={b}>{fd(contractStart)}</td>
                         <td style={lb}>착 공 일 자</td>
-                        <td style={b}>{fd(constStart)}</td>
+                        <td style={{...b, borderRight:'none'}}>{fd(constStart)}</td>
                       </tr>
                       <tr>
-                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
-                        <td colSpan="2" style={{...lb, borderLeft:'none'}}>준 공 기 한</td>
+                        <td style={{...lb, borderLeft:'none'}}>준 공 기 한</td>
                         <td style={b}>{fd(contractEnd)}</td>
                         <td style={lb}>준 공 일 지</td>
-                        <td style={b}>{fd(contractEnd)}</td>
+                        <td style={{...b, borderRight:'none'}}>{fd(contractEnd)}</td>
                       </tr>
                       <tr>
-                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
-                        <td colSpan="2" style={{...lb, verticalAlign:'top', borderLeft:'none'}}>용역이행사항</td>
-                        <td colSpan="3" style={{...b, lineHeight:'2.2', textAlign:'left'}}>
+                        <td style={{...lb, verticalAlign:'center', borderLeft:'none'}}>용역이행사항</td>
+                        <td colSpan="3" style={{...b, lineHeight:'2.2', textAlign:'left', borderRight:'none'}}>
                           <div>○ 용역이행기간 : {ps.replace(/-/g,'.')} ~ {pe.replace(/-/g,'.')}.</div>
                           <div>○ 수집운반량 : {totalW.toFixed(3)}톤</div>
                           <div>○ 산출기초 : {totalW.toFixed(3)}톤 × {unitPrice.toLocaleString()}원 = {billingAmt.toLocaleString()}원</div>
@@ -588,17 +612,17 @@ export default function ReportPrintPage({
                   </table>
 
                 {/* 본문 + 서명 영역 (외곽 박스 안) */}
-                <div style={{flex:1, padding:'5mm 8mm', display:'flex', flexDirection:'column'}}>
-                  <div style={{textAlign:'center', fontSize:'10.5pt', lineHeight:'2', marginBottom:'3mm'}}>
+                <div style={{flex:1, padding:'10mm 8mm', display:'flex', flexDirection:'column'}}>
+                  <div style={{textAlign:'center', fontSize:'12pt', lineHeight:'2', marginBottom:'3mm'}}>
                     위 용역에 대한 과업지시서 및 기타계약조건의 내용과 같이<br/>
                     기성 되었기에 기성부분검사원을 제출합니다.
                   </div>
-                  <div style={{textAlign:'center', fontSize:'10.5pt', margin:'3mm 0'}}>
-                    {year}년 {monthPad}월　　　일
+                  <div style={{textAlign:'center', fontSize:'12pt', margin:'3mm 0'}}>
+                    {year}년 {monthPad}월　　일
                   </div>
-                  <div style={{textAlign:'right', fontSize:'10.5pt', lineHeight:'2.4', marginTop:'4mm'}}>
-                    <div>업 체 명 : {settings.company_name}</div>
-                    <div>대 표 자 : {settings.ceo_name}　　(인)</div>
+                  <div style={{textAlign:'right', fontSize:'12pt', marginTop:'4mm'}}>
+                    <div style={{marginBottom:'6mm'}}>업 체 명 : {settings.company_name}</div>
+                    <div>대 표 자 : {(settings.ceo_name||'').split('').join(' ')}　　(인)</div>
                   </div>
                   <div style={{fontWeight:'bold', textDecoration:'underline', fontSize:'12pt', marginTop:'auto', paddingTop:'4mm'}}>
                     {recipient2 || clientName}수&nbsp;&nbsp;귀하
@@ -607,7 +631,7 @@ export default function ReportPrintPage({
               </div>
 
               {/* 구비서류 (외곽 박스 아래 별도 영역) */}
-              <div style={{border:'1px solid #000', marginTop:'3mm', padding:'3mm 5mm', fontSize:'10pt'}}>
+              <div style={{border:'1px solid #000', marginTop:'0mm', padding:'3mm 5mm 15mm', fontSize:'10pt',borderTop:'none'}}>
                 &lt;구비서류&gt;
               </div>
             </>);
@@ -615,82 +639,59 @@ export default function ReportPrintPage({
 
           {/* 시트 2: 기성계 */}
           {showBillingSheet(2) && <span className="page-label">▌ 기성계</span>}
-          {showBillingSheet(2) && <div className="page-doc">
-            <div className="doc-title">기　성　계</div>
-            <div className="gi-meta">
-              <table>
-                <tbody>
-                  <tr>
-                    <td>계 약 건 명</td>
-                    <td colSpan="3" style={{fontWeight:'normal'}}>{contractName}</td>
-                  </tr>
-                  <tr>
-                    <td>계 약 번 호</td>
-                    <td style={{fontWeight:'normal'}}>{contractNumber}</td>
-                    <td>계 약 금 액</td>
-                    <td style={{fontWeight:'normal',textAlign:'right'}}>{contractAmt.toLocaleString()} 원</td>
-                  </tr>
-                  <tr>
-                    <td>계 약 기 간</td>
-                    <td style={{fontWeight:'normal'}}>{contractStart} ~ {contractEnd}</td>
-                    <td>기 성 기 간</td>
-                    <td style={{fontWeight:'normal'}}>{periodLabel}</td>
-                  </tr>
-                  <tr>
-                    <td>공 급 자</td>
-                    <td style={{fontWeight:'normal'}}>{settings.company_name} 대표이사 {settings.ceo_name}</td>
-                    <td>사 업 자 번 호</td>
-                    <td style={{fontWeight:'normal'}}>{settings.company_reg}</td>
-                  </tr>
-                  <tr>
-                    <td>주　　소</td>
-                    <td colSpan="3" style={{fontWeight:'normal'}}>{settings.company_addr}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <table className="doc-table">
+          {showBillingSheet(2) && <div className="page-doc" style={{display:'flex', flexDirection:'column'}}>
+            <div className="doc-title" style={{textDecoration:'underline', textUnderlineOffset:'6px', letterSpacing:'12px', marginBottom:'5mm'}}>
+기　성　계</div>
+            <div className="gi-subtitle" style={{textAlign:'center', fontSize:'11pt', marginBottom:'20mm'}}>(기성금: {monthPad}월)</div>
+            <ul className="gi-items">
+              <li><span className="lbl">○ 계 약 건 명 :</span> {contractName}</li>
+              <li><span className="lbl">○ 계 약 금 액 :</span> 금 {toKorean(contractAmt).replace('원정','').trim()} 원정 (₩{contractAmt.toLocaleString()})</li>
+              <li><span className="lbl">○ 금회기성금액 :</span> 금 {toKorean(billingAmt).replace('원정','').trim()} 원정 (₩{billingAmt.toLocaleString()})</li>
+              <li><span className="lbl">○ 청 구 금 액 :</span> 금 {toKorean(billingAmt).replace('원정','').trim()} 원정 (₩{billingAmt.toLocaleString()})</li>
+              <li><span className="lbl">○ 계약 연월일 :</span> {contractStart ? contractStart.replace(/-/g,'년 ').replace(/-/,'월 ')+'일' : ''}</li>
+            </ul>
+            <div className="gi-body-text">위와 같이 청구하오니 아래 계좌에 입금하여 주시기 바랍니다.</div>
+            <div className="gi-sec-title">○ 입금의뢰 계좌내용</div>
+            <table className="gi-acct-table">
               <thead>
                 <tr>
-                  <th rowSpan="2">품　　명</th>
-                  <th rowSpan="2">단위</th>
-                  <th colSpan="3">계　약　내　역</th>
-                  <th colSpan="3">기　성　내　역</th>
-                </tr>
-                <tr>
-                  <th>수량</th><th>단가 (원)</th><th>계약금액 (원)</th>
-                  <th>수량</th><th>단가 (원)</th><th>기성금액 (원)</th>
+                  <th>구분</th><th>은행명</th><th>채주성명</th>
+                  <th>청구금액</th><th>예금종류</th><th>계좌번호</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>음식물류폐기물 수집·운반</td>
-                  <td className="c">톤</td>
-                  <td className="c">-</td>
-                  <td className="r">{unitPrice.toLocaleString()}</td>
-                  <td className="r">{contractAmt.toLocaleString()}</td>
-                  <td className="r">{totalW.toFixed(3)}</td>
-                  <td className="r">{unitPrice.toLocaleString()}</td>
+                  <td style={{fontWeight:'bold'}}>운반업체</td>
+                  <td>{settings.bank_name || ''}</td>
+                  <td>{settings.company_name || ''}</td>
                   <td className="r">{billingAmt.toLocaleString()}</td>
+                  <td>{settings.bank_type || ''}</td>
+                  <td>{settings.bank_account || ''}</td>
                 </tr>
               </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="4">합　　계</td>
-                  <td className="r">{contractAmt.toLocaleString()}</td>
-                  <td colSpan="2"></td>
-                  <td className="r">{billingAmt.toLocaleString()}</td>
-                </tr>
-              </tfoot>
             </table>
-            <div className="amount-box" style={{marginTop:'6mm'}}>
-              <div>기성금액 합계 : 금 <strong>{billingAmt.toLocaleString()}</strong>원</div>
-              <div>한 글 금 액 : 금 <strong>{toKorean(billingAmt)}</strong></div>
+            <div className="gi-date-line">{year}년 {monthPad}월　　　일</div>
+            <div className="gi-requester">
+              <div className="req-inner">
+                <span className="req-label">위 청구인(계약자)</span>
+                <div>
+                  <div className="req-row">
+                    <span className="req-key">주　소 :</span>
+                    <span>&nbsp;{settings.company_addr || ''}</span>
+                  </div>
+                  <div className="req-row">
+                    <span className="req-key">상　호 :</span>
+                    <span>&nbsp;{settings.company_name || ''}</span>
+                  </div>
+                  <div className="req-row">
+                    <span className="req-key">성　명 :</span>
+                    <span>&nbsp;{(settings.ceo_name||'').split('').join(' ')}　　(인)</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="sign-block">
-              <div>{year}년 {month}월 {peLastDay}일</div>
-              <div className="company">{settings.company_name}</div>
-              <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
+            <div className="gi-recipient">
+              {recipient1 || clientName}&nbsp;&nbsp;귀하
             </div>
           </div>}
 

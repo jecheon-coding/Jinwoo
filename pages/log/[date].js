@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/router';
 import supabase from '../../lib/supabase';
-import { requireAuth } from '../../lib/auth';
+import { requireAuth, getRole } from '../../lib/auth';
 
 LogPage.noLayout = true;
 
@@ -26,6 +27,7 @@ function fmtName(v) {
 export async function getServerSideProps({ req, params, query }) {
   const authRedirect = requireAuth(req, false);
   if (authRedirect) return authRedirect;
+  const role = getRole(req);
 
   const { date } = params;
   const contractId = query.contract ? parseInt(query.contract) : null;
@@ -52,11 +54,13 @@ export async function getServerSideProps({ req, params, query }) {
   const presentWorkers = (wRes.data || []).filter(w => (attMap[w.id] || 0) > 0);
 
   return {
-    props: { date, record: recRes.data || null, presentWorkers, settings },
+    props: { date, contractId: contractId || null, role, record: recRes.data || null, presentWorkers, settings },
   };
 }
 
-export default function LogPage({ date, record, presentWorkers, settings }) {
+export default function LogPage({ date, contractId, role, record, presentWorkers, settings }) {
+  const router = useRouter();
+  const isAdmin = role === 'admin';
   const d   = new Date(date);
   const dow = DAYS[d.getDay()];
   const ymd = `${d.getFullYear()}.  ${d.getMonth()+1}.  ${d.getDate()}.`;
@@ -81,22 +85,38 @@ export default function LogPage({ date, record, presentWorkers, settings }) {
         body { font-family: '맑은 고딕','Malgun Gothic',sans-serif; background: #e5e7eb; color: #000; }
 
         .btn-bar {
-          position: sticky; top: 0; z-index: 100;
-          display: flex; justify-content: center; gap: 8px;
-          padding: 10px; background: #e5e7eb;
+          position: fixed; top: 0; left: 0; right: 0; height: 48px; z-index: 100;
+          display: flex; align-items: center; justify-content: center;
+          background: #1f2937; gap: 16px; padding: 0 60px;
         }
         @media print { .btn-bar { display: none !important; } }
-        .btn-back {
-          background: #fff; color: #374151; border: 1px solid #9ca3af;
-          padding: 7px 18px; border-radius: 6px; font-size: 13px;
-          text-decoration: none; display: inline-block;
+        .btn-bar a, .btn-bar button, .log-date-input {
+          height: 32px; box-sizing: border-box; font-size: 13px;
+          border-radius: 5px; white-space: nowrap; cursor: pointer;
+          display: inline-flex; align-items: center; padding: 0 14px;
+          line-height: 1;
         }
+        .log-date-input::-webkit-calendar-picker-indicator {
+          filter: invert(1); opacity: 0.7; cursor: pointer;
+        }
+        .btn-back {
+          background: #374151; color: #e5e7eb; border: 1px solid #4b5563;
+          text-decoration: none;
+        }
+        .btn-back:hover { background: #4b5563; }
         .btn-print {
-          background: #16a34a; color: #fff; border: none;
-          padding: 7px 18px; border-radius: 6px; font-size: 13px; cursor: pointer;
+          background: #16a34a; color: #fff; border: 1px solid #16a34a;
+        }
+        .btn-print:hover { background: #15803d; }
+        .log-date-input {
+          background: #374151 !important; color: #e5e7eb !important;
+          border: 1px solid #4b5563; width: 148px; padding: 0 8px;
+          color-scheme: dark; -webkit-appearance: none; appearance: none;
+          height: 32px !important; box-sizing: border-box;
         }
 
         @media screen {
+          body { padding-top: 64px; }
           .page { box-shadow: 0 4px 20px rgba(0,0,0,0.3); margin: 0 auto 40px; }
         }
         @media print {
@@ -172,9 +192,19 @@ export default function LogPage({ date, record, presentWorkers, settings }) {
       `}} />
 
       <div className="btn-bar">
-        <Link href="/history" className="btn-back">← 뒤로</Link>
-        <button className="btn-print" onClick={() => window.print()}>🖨 인쇄</button>
-        <LogPDFButton {...pdfProps} />
+        <Link href="/daily" className="btn-back">← 뒤로</Link>
+        {isAdmin && <button className="btn-print" onClick={() => window.print()}>인쇄</button>}
+        {isAdmin && <LogPDFButton {...pdfProps} />}
+        <input
+          type="date" value={date}
+          className="log-date-input"
+          style={{marginLeft:'auto'}}
+          onChange={e => {
+            if (!e.target.value) return;
+            const qs = contractId ? `?contract=${contractId}` : '';
+            router.push(`/log/${e.target.value}${qs}`);
+          }}
+        />
       </div>
 
       <div className="page">
