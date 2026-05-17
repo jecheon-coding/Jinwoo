@@ -42,9 +42,7 @@ export default function LoginPage() {
     body { font-family: '맑은 고딕','Malgun Gothic',sans-serif; background: #f0f9ff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
     .card { background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.12); padding: 40px 36px; width: 100%; max-width: 360px; }
     .logo { text-align: center; margin-bottom: 28px; }
-    .logo .icon { font-size: 40px; }
-    .logo h1 { font-size: 18px; color: #1e40af; font-weight: 700; margin-top: 8px; }
-    .logo p { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+    .logo p { font-size: 13px; color: #6b7280; margin-top: 2px; letter-spacing: 1px; }
     label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
     input[type=password] { width: 100%; padding: 12px 14px; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 15px; outline: none; transition: border-color .2s; }
     input[type=password]:focus { border-color: #2563eb; }
@@ -68,7 +66,8 @@ export default function LoginPage() {
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="card">
         <div className="logo">
-          <img src="/logo.svg" alt="진우환경 로고" style={{width:'200px', marginBottom:'8px'}} />
+          <img src="/logo.svg" alt="진우환경 로고" style={{width:'210px', marginBottom:'10px'}} />
+          <p>일일 작업일지</p>
         </div>
         <form onSubmit={handleSubmit}>
           <label>비밀번호</label>
