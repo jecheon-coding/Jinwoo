@@ -324,4 +324,4 @@ function StatsTab({ year, byMonth }) {
 }
 
 const th = { padding:'8px 12px', fontWeight:'600', fontSize:'13px', textAlign:'left', borderBottom:'2px solid #e5e7eb' };
-const td = { padding:'8px 12px', fontSize:'13px' };
+const td = { padding:'8px 12px', fontSize:'13px', textAlign:'left' };

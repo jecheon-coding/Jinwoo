@@ -9,25 +9,32 @@ export async function getServerSideProps({ req }) {
   const role = getRole(req);
   const { data } = await supabase.from('settings').select('*');
   const settings = {};
-  (data || []).forEach(r => { settings[r.key] = r.value; });
+  const PW_KEYS = ['admin_password', 'user_password'];
+  (data || []).forEach(r => { if (!PW_KEYS.includes(r.key)) settings[r.key] = r.value; });
   return { props: { role, initialSettings: settings } };
 }
 
 export default function SettingsPage({ initialSettings }) {
-  const [form, setForm]     = useState(initialSettings);
-  const [saved, setSaved]   = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [form, setForm]       = useState(initialSettings);
+  const [passwords, setPasswords] = useState({ admin_password: '', user_password: '' });
+  const [saved, setSaved]     = useState(false);
+  const [saving, setSaving]   = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setPw = (k, v) => setPasswords(p => ({ ...p, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    const body = { ...form };
+    if (passwords.admin_password) body.admin_password = passwords.admin_password;
+    if (passwords.user_password)  body.user_password  = passwords.user_password;
     await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify(body),
     });
+    setPasswords({ admin_password: '', user_password: '' });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -127,16 +134,16 @@ export default function SettingsPage({ initialSettings }) {
         <div className="card">
           <h2>접근 비밀번호</h2>
           <p style={{fontSize:'12px',color:'#9ca3af',marginBottom:'10px'}}>
-            비밀번호를 비워두면 기본값(관리자: admin / 사용자: user)이 사용됩니다.
+            변경할 비밀번호만 입력하세요. 비워두면 기존 비밀번호가 유지됩니다. 비밀번호는 암호화되어 저장됩니다.
           </p>
           <div className="form-grid">
             <div className="form-group">
               <label>관리자 비밀번호</label>
-              <input type="text" value={form.admin_password||''} onChange={e=>set('admin_password',e.target.value)} placeholder="관리자용 비밀번호" />
+              <input type="password" value={passwords.admin_password} onChange={e=>setPw('admin_password',e.target.value)} placeholder="변경 시에만 입력" autoComplete="new-password" />
             </div>
             <div className="form-group">
               <label>사용자 비밀번호 (작업자용)</label>
-              <input type="text" value={form.user_password||''} onChange={e=>set('user_password',e.target.value)} placeholder="작업자용 비밀번호" />
+              <input type="password" value={passwords.user_password} onChange={e=>setPw('user_password',e.target.value)} placeholder="변경 시에만 입력" autoComplete="new-password" />
             </div>
           </div>
         </div>
