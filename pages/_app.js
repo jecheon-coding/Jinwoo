@@ -11,6 +11,9 @@ export default function App({ Component, pageProps }) {
         <meta property="og:title" content="진우환경 일일 작업일지" />
         <meta property="og:description" content="진우환경 일일 작업일지" />
         <meta property="og:type" content="website" />
+        <meta property="og:image" content="https://jinwoo-amber.vercel.app/og.svg" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       {Component.noLayout
