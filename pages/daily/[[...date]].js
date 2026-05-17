@@ -103,8 +103,11 @@ export default function DailyPage(props) {
       <>
         <div className="page-header"><h1>일일 운행 입력</h1></div>
         <div className="empty">
-          <p>등록된 계약이 없습니다. 먼저 계약을 등록해 주세요.</p>
-          <Link href="/contracts" className="btn btn-primary">계약 관리</Link>
+          <p>등록된 계약이 없습니다.</p>
+          {role === 'admin'
+            ? <Link href="/contracts" className="btn btn-primary">계약 관리</Link>
+            : <p style={{color:'#9ca3af',fontSize:'14px'}}>관리자에게 문의하세요.</p>
+          }
         </div>
       </>
     );
@@ -218,7 +221,10 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
   const handleSubmit = (e) => {
     e.preventDefault();
     const d = form.record_date;
-    doSave(`/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}/${contractId}`);
+    const redirectTo = role === 'admin'
+      ? `/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}/${contractId}`
+      : `/log/${d}?contract=${contractId}`;
+    doSave(redirectTo);
   };
 
   const handleSaveAndPrint = (e) => {
@@ -231,7 +237,7 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
     if (!confirm('이 날의 기록을 삭제하시겠습니까?')) return;
     await fetch(`/api/records/${form.record_date}?contract_id=${contractId}`, { method: 'DELETE' });
     const d = form.record_date;
-    router.push(`/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}/${contractId}`);
+    router.push(`/daily/${d}/${contractId}`);
   };
 
   return (
@@ -245,7 +251,7 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
               🖨 일지 출력
             </Link>
           )}
-          {record && (
+          {record && role === 'admin' && (
             <button className="btn btn-danger btn-sm" onClick={handleDelete}>삭제</button>
           )}
         </div>
@@ -456,7 +462,9 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
             onClick={handleSaveAndPrint}>
             {saving ? '저장 중...' : '🖨 저장 후 출력'}
           </button>
-          <button type="button" className="btn btn-outline" onClick={() => router.back()}>취소</button>
+          {role === 'admin' && (
+            <button type="button" className="btn btn-outline" onClick={() => router.back()}>취소</button>
+          )}
         </div>
       </form>
     </>
