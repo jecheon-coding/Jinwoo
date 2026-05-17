@@ -514,70 +514,78 @@ export default function ReportPrintPage({
       {/* ══ 기성/청구 그룹 ══ */}
       {showBilling && (
         <>
-          {/* 시트 1: 기성부분검사원 */}
+         {/* 시트 1: 기성부분검사원 */}
           {showBillingSheet(1) && <span className="page-label">▌ 기성부분검사원</span>}
           {showBillingSheet(1) && <div className="page-doc" style={{padding:'10mm 12mm 10mm', display:'flex', flexDirection:'column'}}>{(() => {
-            const fd = (d) => { if(!d) return ''; const p=d.split('-'); return p.length===3?`${p[0]}년 ${p[1]}월 ${p[2]}일`:d; };
-            const b  = {border:'1px solid #000', padding:'5px 8px'};
-            const lb = {...b, fontWeight:'bold', background:'#f5f5f5', textAlign:'center', whiteSpace:'nowrap'};
-            return (<>
-              {/* 외곽 테두리 박스 */}
-              <div style={{border:'2px solid #000', flex:1, display:'flex', flexDirection:'column'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'10pt'}}>
-                  <colgroup>
-                    <col style={{width:'7%'}} /><col style={{width:'15%'}} />
-                    <col style={{width:'31%'}} /><col style={{width:'13%'}} />
-                    <col style={{width:'34%'}} />
-                  </colgroup>
-                  <tbody>
-                    <tr>
-                      <td colSpan="5" style={{...lb, textAlign:'center', fontSize:'15pt', letterSpacing:'8px', padding:'4mm 0', background:'#fff', borderBottom:'1px solid #000', border:'none', borderBottom:'1px solid #000'}}>
-                        기 성 부 분 검 사 원
-                      </td>
-                    </tr>
-                    <tr>
-                      <td rowSpan="2" style={{...lb, writingMode:'vertical-lr', textOrientation:'upright', letterSpacing:'4px', fontSize:'11pt'}}>계약자</td>
-                      <td style={lb}>업 체 명</td>
-                      <td style={b}>{settings.company_name}</td>
-                      <td colSpan="2" style={b}><strong>대 표 자</strong>　{settings.ceo_name}</td>
-                    </tr>
-                    <tr>
-                      <td style={lb}>사업장소재지</td>
-                      <td style={b}>{settings.company_addr}</td>
-                      <td colSpan="2" style={b}><strong>전화번호</strong>　{settings.company_phone || ''}</td>
-                    </tr>
-                    <tr>
-                      <td colSpan="2" style={lb}>용 역 명</td>
-                      <td colSpan="3" style={b}>{contractName}</td>
-                    </tr>
-                    <tr>
-                      <td colSpan="2" style={lb}>계 약 금 액</td>
-                      <td style={b}>톤당 : {unitPrice.toLocaleString()}원</td>
-                      <td style={lb}>기성부분<br/>준공금액</td>
-                      <td style={b}>일금 : {billingAmt.toLocaleString()}원<br/>(일금 {toKorean(billingAmt)} 원정)</td>
-                    </tr>
-                    <tr>
-                      <td colSpan="2" style={lb}>계 약 일 자</td>
-                      <td style={b}>{fd(contractStart)}</td>
-                      <td style={lb}>착 공 일 자</td>
-                      <td style={b}>{fd(constStart)}</td>
-                    </tr>
-                    <tr>
-                      <td colSpan="2" style={lb}>준 공 기 한</td>
-                      <td style={b}>{fd(contractEnd)}</td>
-                      <td style={lb}>준 공 일 지</td>
-                      <td style={b}>{fd(contractEnd)}</td>
-                    </tr>
-                    <tr>
-                      <td colSpan="2" style={{...lb, verticalAlign:'top'}}>용역이행사항</td>
-                      <td colSpan="3" style={{...b, lineHeight:'2.2', textAlign:'left'}}>
-                        <div>○ 용역이행기간 : {ps.replace(/-/g,'.')} ~ {pe.replace(/-/g,'.')}.</div>
-                        <div>○ 수집운반량 : {totalW.toFixed(3)}톤</div>
-                        <div>○ 산출기초 : {totalW.toFixed(3)}톤 × {unitPrice.toLocaleString()}원 = {billingAmt.toLocaleString()}원</div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              const fd = (d) => { if(!d) return ''; const p=d.split('-'); return p.length===3?`${p[0]}년 ${p[1]}월 ${p[2]}일`:d; };
+              const b  = {border:'1px solid #000', padding:'5px 8px'};
+              const lb = {...b, fontWeight:'bold', background:'#f5f5f5', textAlign:'center', whiteSpace:'nowrap'};
+              return (<>
+                {/* 외곽 테두리 박스 */}
+                <div style={{border:'1px solid #000', flex:1, display:'flex', flexDirection:'column'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'10pt',tableLayout:'fixed'}}>
+                    <colgroup>
+                      <col style={{width:'7%'}} /><col style={{width:'15%'}} />
+                      <col style={{width:'31%'}} /><col style={{width:'13%'}} />
+                      <col style={{width:'34%'}} />
+                    </colgroup>
+                    <tbody>
+                      <tr>
+                        {/* 제목 행도 외곽 박스와 겹치지 않도록 테두리 조정 */}
+                        <td colSpan="5" style={{...lb, textAlign:'center', fontSize:'15pt', letterSpacing:'8px', padding:'4mm 0', background:'#fff', border:'none', borderBottom:'1px solid #000'}}>
+                          기 성 부 분 검 사 원
+                        </td>
+                      </tr>
+                      <tr>
+                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
+                        <td rowSpan="2" style={{...lb, writingMode:'vertical-lr', textOrientation:'upright', letterSpacing:'4px', fontSize:'11pt', borderLeft:'none'}}>계약자</td>
+                        <td style={lb}>업 체 명</td>
+                        <td style={b}>{settings.company_name}</td>
+                        <td colSpan="2" style={b}><strong>대 표 자</strong>　{settings.ceo_name}</td>
+                      </tr>
+                      <tr>
+                        {/* 위에서 rowSpan="2"로 계약자가 첫 열을 차지하므로, 이 행의 첫 셀은 두 번째 열인 '사업장소재지'입니다. 하지만 시각적으로 가장 왼쪽은 아니므로 테두리를 유지합니다. */}
+                        <td style={lb}>사업장소재지</td>
+                        <td style={b}>{settings.company_addr}</td>
+                        <td colSpan="2" style={b}><strong>전화번호</strong>　{settings.company_phone || ''}</td>
+                      </tr>
+                      <tr>
+                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
+                        <td colSpan="2" style={{...lb, borderLeft:'none'}}>용 역 명</td>
+                        <td colSpan="3" style={b}>{contractName}</td>
+                      </tr>
+                      <tr>
+                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
+                        <td colSpan="2" style={{...lb, borderLeft:'none'}}>계 약 금 액</td>
+                        <td style={b}>톤당 : {unitPrice.toLocaleString()}원</td>
+                        <td style={lb}>기성부분<br/>준공금액</td>
+                        <td style={b}>일금 : {billingAmt.toLocaleString()}원<br/>(일금 {toKorean(billingAmt)} 원정)</td>
+                      </tr>
+                      <tr>
+                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
+                        <td colSpan="2" style={{...lb, borderLeft:'none'}}>계 약 일 자</td>
+                        <td style={b}>{fd(contractStart)}</td>
+                        <td style={lb}>착 공 일 자</td>
+                        <td style={b}>{fd(constStart)}</td>
+                      </tr>
+                      <tr>
+                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
+                        <td colSpan="2" style={{...lb, borderLeft:'none'}}>준 공 기 한</td>
+                        <td style={b}>{fd(contractEnd)}</td>
+                        <td style={lb}>준 공 일 지</td>
+                        <td style={b}>{fd(contractEnd)}</td>
+                      </tr>
+                      <tr>
+                        {/* 가장 왼쪽에 위치하므로 borderLeft: 'none' 추가 */}
+                        <td colSpan="2" style={{...lb, verticalAlign:'top', borderLeft:'none'}}>용역이행사항</td>
+                        <td colSpan="3" style={{...b, lineHeight:'2.2', textAlign:'left'}}>
+                          <div>○ 용역이행기간 : {ps.replace(/-/g,'.')} ~ {pe.replace(/-/g,'.')}.</div>
+                          <div>○ 수집운반량 : {totalW.toFixed(3)}톤</div>
+                          <div>○ 산출기초 : {totalW.toFixed(3)}톤 × {unitPrice.toLocaleString()}원 = {billingAmt.toLocaleString()}원</div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
 
                 {/* 본문 + 서명 영역 (외곽 박스 안) */}
                 <div style={{flex:1, padding:'5mm 8mm', display:'flex', flexDirection:'column'}}>
