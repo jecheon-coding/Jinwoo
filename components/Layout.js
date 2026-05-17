@@ -16,7 +16,7 @@ export default function Layout({ children, role }) {
       <nav>
         <div className="nav-inner">
           <Link href={isAdmin ? '/' : '/daily'} className="nav-logo">
-            <img src="/logo.svg" alt="진우환경" style={{height:'36px', filter:'brightness(0) invert(1)'}} />
+            <img src="/logo-nav.svg" alt="진우환경" style={{height:'34px'}} />
           </Link>
           <div className="nav-links">
             <Link href="/daily" className={active('/daily')}>일일 입력</Link>
