@@ -1,13 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 72" width="300" height="72">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 60" width="260" height="60">
   <!-- JW 심볼 -->
-  <text x="2" y="50" font-family="Arial Black, Arial, sans-serif" font-size="46" font-weight="900" fill="#1e3a8a">J</text>
-  <text x="30" y="50" font-family="Arial Black, Arial, sans-serif" font-size="46" font-weight="900" fill="#dc2626">W</text>
+  <text x="2" y="46" font-family="Arial Black, Arial, sans-serif" font-size="46" font-weight="900" fill="#1e3a8a">J</text>
+  <text x="30" y="46" font-family="Arial Black, Arial, sans-serif" font-size="46" font-weight="900" fill="#dc2626">W</text>
 
   <!-- 세로 구분선 -->
-  <line x1="82" y1="8" x2="82" y2="64" stroke="#d1d5db" stroke-width="1.5"/>
+  <line x1="82" y1="6" x2="82" y2="54" stroke="#d1d5db" stroke-width="1.5"/>
 
   <!-- 회사명 -->
-  <text x="91" y="34" font-family="'Malgun Gothic', Arial, sans-serif" font-size="26" font-weight="700" fill="#111827">(주)진우환경</text>
-  <!-- 부제 -->
-  <text x="91" y="56" font-family="'Malgun Gothic', Arial, sans-serif" font-size="13" fill="#6b7280">[사업장폐기물 수집·운반]</text>
+  <text x="94" y="38" font-family="'Malgun Gothic', Arial, sans-serif" font-size="26" font-weight="700" fill="#111827">(주)진우환경</text>
 </svg>
