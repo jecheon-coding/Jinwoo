@@ -68,9 +68,7 @@ export default function LoginPage() {
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="card">
         <div className="logo">
-          <div className="icon">♻</div>
-          <h1>음식물 수거 관리</h1>
-          <p>주식회사 진우환경</p>
+          <img src="/logo.svg" alt="진우환경 로고" style={{width:'200px', marginBottom:'8px'}} />
         </div>
         <form onSubmit={handleSubmit}>
           <label>비밀번호</label>
