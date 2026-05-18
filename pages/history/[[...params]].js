@@ -142,28 +142,30 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
         </span>
       </div>
 
-      {/* 요약 */}
-      <div className="summary-row">
-        <div className="summary-card">
-          <div className="s-label">근무일수</div>
-          <div className="s-value">{records.length}일</div>
+      {/* 요약 — admin만 표시 */}
+      {role === 'admin' && (
+        <div className="summary-row">
+          <div className="summary-card">
+            <div className="s-label">근무일수</div>
+            <div className="s-value">{records.length}일</div>
+          </div>
+          <div className="summary-card hl">
+            <div className="s-label">총 수거량</div>
+            <div className="s-value">{totalW.toFixed(3)}</div>
+            <div className="s-sub">톤</div>
+          </div>
+          <div className="summary-card">
+            <div className="s-label">칩 수거량</div>
+            <div className="s-value">{chipL.toLocaleString()}</div>
+            <div className="s-sub">ℓ</div>
+          </div>
+          <div className="summary-card">
+            <div className="s-label">청구 예정액</div>
+            <div className="s-value">{totalAmt.toLocaleString()}</div>
+            <div className="s-sub">원</div>
+          </div>
         </div>
-        <div className="summary-card hl">
-          <div className="s-label">총 수거량</div>
-          <div className="s-value">{totalW.toFixed(3)}</div>
-          <div className="s-sub">톤</div>
-        </div>
-        <div className="summary-card">
-          <div className="s-label">칩 수거량</div>
-          <div className="s-value">{chipL.toLocaleString()}</div>
-          <div className="s-sub">ℓ</div>
-        </div>
-        <div className="summary-card">
-          <div className="s-label">청구 예정액</div>
-          <div className="s-value">{totalAmt.toLocaleString()}</div>
-          <div className="s-sub">원</div>
-        </div>
-      </div>
+      )}
 
       {/* 테이블 */}
       {records.length === 0 ? (
