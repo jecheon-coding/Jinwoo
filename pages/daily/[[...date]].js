@@ -446,24 +446,30 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
           </div>
         </div>
 
+        {isPastDate && (
+          <div style={{
+            background: '#fef9c3', border: '1px solid #fde047',
+            borderRadius: '8px', padding: '10px 14px',
+            fontSize: '13px', color: '#854d0e', marginBottom: '8px',
+            display: 'flex', alignItems: 'center', gap: '8px',
+          }}>
+            <span style={{fontSize:'16px'}}>⚠️</span>
+            <span>과거 날짜를 수정합니다.</span>
+          </div>
+        )}
+
         <div className="form-actions">
-          {isPastDate ? (
-            <p style={{color:'#9ca3af', fontSize:'14px'}}>오늘 날짜만 입력할 수 있습니다.</p>
-          ) : (
-            <>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? '저장 중...' : record ? '수정 저장' : '저장'}
-              </button>
-              {!isUser && (
-                <button type="button" className="btn btn-success" disabled={saving}
-                  onClick={handleSaveAndPrint}>
-                  {saving ? '저장 중...' : '🖨 저장 후 출력'}
-                </button>
-              )}
-              {role === 'admin' && (
-                <button type="button" className="btn btn-outline" onClick={() => router.back()}>취소</button>
-              )}
-            </>
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? '저장 중...' : record ? '수정 저장' : '저장'}
+          </button>
+          {!isUser && (
+            <button type="button" className="btn btn-success" disabled={saving}
+              onClick={handleSaveAndPrint}>
+              {saving ? '저장 중...' : '🖨 저장 후 출력'}
+            </button>
+          )}
+          {role === 'admin' && (
+            <button type="button" className="btn btn-outline" onClick={() => router.back()}>취소</button>
           )}
         </div>
       </form>

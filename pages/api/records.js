@@ -1,4 +1,5 @@
 import supabase from '../../lib/supabase';
+import { getRole } from '../../lib/auth';
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
@@ -36,12 +37,31 @@ export default async function handler(req, res) {
 
     let error;
     if (existing) {
-      // update by (record_date, original contract_id) — works with both record_date PK and id PK schemas
-      let updQ = supabase.from('records').update(recordData).eq('record_date', body.record_date);
       const origCid = existing.contract_id;
+
+      // 수정 전 데이터 조회 (audit log 용)
+      let fetchQ = supabase.from('records').select('*').eq('record_date', body.record_date);
+      if (origCid) fetchQ = fetchQ.eq('contract_id', origCid);
+      else         fetchQ = fetchQ.is('contract_id', null);
+      const { data: beforeData } = await fetchQ.maybeSingle();
+
+      // update by (record_date, original contract_id)
+      let updQ = supabase.from('records').update(recordData).eq('record_date', body.record_date);
       if (origCid) updQ = updQ.eq('contract_id', origCid);
       else         updQ = updQ.is('contract_id', null);
       ({ error } = await updQ);
+
+      // 수정 이력 저장
+      if (!error && beforeData) {
+        const role = getRole(req);
+        await supabase.from('record_audit_log').insert({
+          record_date:  body.record_date,
+          contract_id:  contractId,
+          changed_by:   role || 'unknown',
+          before_data:  beforeData,
+          after_data:   recordData,
+        });
+      }
     } else {
       ({ error } = await supabase.from('records').insert(recordData));
     }
