@@ -19,7 +19,7 @@ function getPeriod(year, month, startDay) {
 }
 
 export async function getServerSideProps({ req, params, query }) {
-  const authRedirect = requireAuth(req, true);
+  const authRedirect = requireAuth(req, false);
   if (authRedirect) return authRedirect;
 
   const role = getRole(req);
@@ -102,9 +102,11 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
   return (
     <>
       <div className="page-header">
-        <h1>{year}년 {month}월 수거 기록</h1>
+        <h1>{year}년 {month}월 운행 기록</h1>
         <div className="btn-group">
-          <Link href={`/report/${year}/${month}`} className="btn btn-success">보고서 출력</Link>
+          {role === 'admin' && (
+            <Link href={`/report/${year}/${month}`} className="btn btn-success">보고서 출력</Link>
+          )}
           <Link href={`/daily/${new Intl.DateTimeFormat('sv',{timeZone:'Asia/Seoul'}).format(new Date())}/${contractId}`} className="btn btn-outline">오늘 입력</Link>
         </div>
       </div>
@@ -205,8 +207,10 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
                       <div style={{display:'flex',gap:'4px',justifyContent:'center'}}>
                         <Link href={`/daily/${r.record_date}/${contractId}?edit=1`}
                           className="btn btn-outline btn-sm">수정</Link>
-                        <button className="btn btn-danger btn-sm"
-                          onClick={() => handleDelete(r.record_date)}>삭제</button>
+                        {role === 'admin' && (
+                          <button className="btn btn-danger btn-sm"
+                            onClick={() => handleDelete(r.record_date)}>삭제</button>
+                        )}
                       </div>
                     </td>
                   </tr>

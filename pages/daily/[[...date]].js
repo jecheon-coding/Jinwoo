@@ -218,11 +218,9 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!confirm('저장하시겠습니까?')) return;
     const d = form.record_date;
-    const redirectTo = role === 'admin'
-      ? `/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}/${contractId}`
-      : `/log/${d}?contract=${contractId}`;
-    doSave(redirectTo);
+    doSave(`/history/${d.slice(0,4)}/${parseInt(d.slice(5,7))}/${contractId}`);
   };
 
   const handleSaveAndPrint = (e) => {
