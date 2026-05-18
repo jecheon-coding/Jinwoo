@@ -195,6 +195,11 @@ export default function ReportPrintPage({
   const css = `
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: '맑은 고딕','Malgun Gothic',sans-serif; font-size: 10pt; color: #000; }
+    .page a, .page-doc a, .page-land a { color: #000 !important; text-decoration: none !important; }
+    .nc-table thead th:first-child, .nc-table tbody td:first-child { border-left: none !important; }
+    .nc-table thead th:last-child,  .nc-table tbody td:last-child  { border-right: none !important; }
+    .nc-table thead th { border-top: none !important; }
+    .nc-table tbody tr:last-child td { border-bottom: none !important; }
     .top-bar { position: fixed; top: 0; left: 0; right: 0; height: 48px; background: #1f2937; display: flex; align-items: center; justify-content: space-between; padding: 0 80px; z-index: 100; gap: 12px; }
     .top-bar-left  { display: flex; gap: 6px; }
     .top-bar-center { display: flex; gap: 5px; flex: 1; justify-content: center; }
@@ -228,12 +233,12 @@ export default function ReportPrintPage({
       body { background: #fff; }
       .print-btn { display: none !important; }
       .page-label { display: none !important; }
-      @page { size: ${sheet === 3 ? 'A4 landscape' : 'A4'}; margin: 0; }
+      @page { size: ${type === 'work' && sheet === 3 ? 'A4 landscape' : 'A4 portrait'}; margin: 0; }
     }
 
     .page {
       width: 210mm; min-height: 297mm;
-      margin: 0 auto; padding: 10mm 20mm;
+      margin: 0 auto; padding: 10mm 20mm 10mm;
       page-break-after: always;
     }
     .page:last-child { page-break-after: auto; }
@@ -250,17 +255,18 @@ export default function ReportPrintPage({
       margin: 0 auto; padding: 25mm 20mm 10mm;
       page-break-after: always;
     }
+    .page-land:last-child { page-break-after: auto; }
 
-    h2.report-title { text-align: center; font-size: 16pt; font-weight: bold; letter-spacing: 4px; margin-bottom: 8mm; border-bottom: 2px solid #000; padding-bottom: 3mm; }
+    h2.report-title { text-align: center; font-size: 16pt; font-weight: bold; letter-spacing: 4px; margin-bottom: 12mm; border-bottom: 2px solid #000; padding-bottom: 3mm; }
     table.rt { width: 100%; border-collapse: collapse; font-size: 9pt; }
-    table.rt th { background: #e5e7eb; color: #111; padding: 5px 6px; text-align: center; border: 1px solid #888; }
-    table.rt td { border: 1px solid #888; padding: 5px 6px; text-align: center; }
+    table.rt th { background: #e5e7eb; color: #111; padding: 15px 6px; text-align: center; border: 1px solid #888; }
+    table.rt td { border: 1px solid #888; padding: 10px 6px; text-align: center; }
     table.rt tfoot td { background: #f0f0f0; font-weight: bold; border: 1px solid #666; padding: 5px 6px; }
     table.rt td.r { text-align: right; }
     table.rt td.l { text-align: left; }
     .att-table { font-size: 7.5pt; }
     .att-table th, .att-table td { padding: 20px 3px; text-align: center; }
-    .sun { color: #dc2626; }
+    .sun { color: #dc2626 !important; }
 
     .doc-title { text-align: center; font-size: 20pt; font-weight: bold; letter-spacing: 10px; margin-bottom: 10mm; }
     .doc-list { margin: 2mm 0 4mm 0; list-style: none; }
@@ -490,11 +496,11 @@ export default function ReportPrintPage({
                           const dow = new Date(d).getDay();
                           return (
                             <td key={d} className={dow===0?'sun':''} style={{fontSize:'7.5pt'}}>
-                              {v !== undefined && parseFloat(v) !== 0 ? v : ''}
+                              {dow === 0 ? (v !== undefined && parseFloat(v) !== 0 ? parseFloat(v).toFixed(1) : '0.0') : (v !== undefined && parseFloat(v) !== 0 ? parseFloat(v).toFixed(1) : '')}
                             </td>
                           );
                         })}
-                        <td style={{fontWeight:'bold'}}>{total}</td>
+                        <td style={{fontWeight:'bold'}}>{total.toFixed(1)}</td>
                       </tr>
                     );
                   })}
@@ -505,9 +511,10 @@ export default function ReportPrintPage({
                         const v = attMap[`${d}_${w.id}`];
                         return s + (v !== undefined ? parseFloat(v) : 0);
                       }, 0);
+                      const dow = new Date(d).getDay();
                       return (
-                        <td key={d} style={{fontWeight:'bold',fontSize:'7.5pt'}}>
-                          {dayTotal > 0 ? dayTotal : ''}
+                        <td key={d} className={dow===0?'sun':''} style={{fontWeight:'bold',fontSize:'7.5pt'}}>
+                          {dow === 0 ? (dayTotal > 0 ? dayTotal.toFixed(1) : '0.0') : (dayTotal > 0 ? dayTotal.toFixed(1) : '')}
                         </td>
                       );
                     })}
@@ -517,7 +524,7 @@ export default function ReportPrintPage({
                           const v = attMap[`${d}_${w.id}`];
                           return ss + (v !== undefined ? parseFloat(v) : 0);
                         }, 0), 0
-                      )}
+                      ).toFixed(1)}
                     </td>
                   </tr>
                 </tbody>
@@ -697,125 +704,160 @@ export default function ReportPrintPage({
 
           {/* 시트 3: 노무비청구내역서 */}
           {showBillingSheet(3) && <span className="page-label">▌ 노무비청구내역서</span>}
-          {showBillingSheet(3) && <div className="page-doc">
-            <div style={{textAlign:'right',fontSize:'9pt',marginBottom:'6mm'}}>
-              {year}년 {monthPad}월분
+          {showBillingSheet(3) && <div className="page-doc" style={{display:'flex', flexDirection:'column', color:'#000', pageBreakAfter:'auto', breakAfter:'auto'}}>
+            <div style={{fontSize:'9pt', fontWeight:'bold', marginBottom:'3mm'}}>【서식2-1】 -근로자가 다수인 경우 첨부</div>
+            <div style={{textAlign:'center', fontSize:'18pt', fontWeight:'bold', letterSpacing:'6px', marginBottom:'5mm'}}>
+              용역근로자 노무비 청구 내역서
             </div>
-            <div className="doc-title">노무비 청구 내역서</div>
-            <ul className="doc-list">
-              <li><span className="lbl">수　　　신 :</span> {recipient1 || clientName}</li>
-              <li><span className="lbl">발　　　신 :</span> {settings.company_name} 대표이사 {settings.ceo_name}</li>
-              <li><span className="lbl">제　　　목 :</span> {contractName} 노무비 청구</li>
-            </ul>
-            <div className="doc-body" style={{marginTop:'6mm'}}>
-              위 계약에 의한 노무비를 아래와 같이 청구합니다.
+            <div style={{fontSize:'10.5pt', fontWeight:'bold', marginBottom:'4mm'}}>
+              ○ 용역명 : {contractName}
             </div>
-            <div className="doc-center">- 아　　래 -</div>
-            <ul className="doc-list">
-              <li><span className="lbl">1. 계 약 건 명 :</span> {contractName}</li>
-              <li><span className="lbl">2. 이 행 기 간 :</span> {periodLabel}</li>
-              <li><span className="lbl">3. 지 급 일 자 :</span> {year}년 {month}월 {salaryDay}일</li>
-              <li><span className="lbl">4. 청 구 금 액 :</span> 금 {totalSalary.toLocaleString()}원 ({toKorean(totalSalary)})</li>
-            </ul>
-            <div className="doc-sub" style={{marginTop:'5mm'}}>5. 노 무 비 내 역</div>
-            <table className="doc-table">
-              <thead>
-                <tr>
-                  <th>연번</th>
-                  <th>성　명</th>
-                  <th>직위 / 직종</th>
-                  <th>지급금액 (원)</th>
-                  <th>비　고</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workers.map((w, i) => (
-                  <tr key={w.id}>
-                    <td className="c">{i + 1}</td>
-                    <td className="c" style={{fontWeight:'bold'}}>{w.name}</td>
-                    <td className="c">{w.position}</td>
-                    <td className="r">{(parseInt(w.monthly_salary) || 0).toLocaleString()}</td>
-                    <td></td>
+            <div style={{border:'0.5px solid #999', height:'120mm', display:'flex', flexDirection:'column'}}>
+              <table className="nc-table" style={{width:'100%', borderCollapse:'collapse', fontSize:'10pt', tableLayout:'fixed', color:'#000'}}>
+                <colgroup>
+                  <col style={{width:'12%'}} />
+                  <col style={{width:'14%'}} />
+                  <col style={{width:'16%'}} />
+                  <col style={{width:'38%'}} />
+                  <col style={{width:'20%'}} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', fontWeight:'bold', color:'#000'}}>해당 월</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', fontWeight:'bold', color:'#000'}}>근로자 성명</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', fontWeight:'bold', color:'#000'}}>청구액</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', fontWeight:'bold', color:'#000'}}>계좌번호</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', fontWeight:'bold', color:'#000'}}>전화번호</th>
                   </tr>
-                ))}
-                {Array.from({length: Math.max(0, 5 - workers.length)}).map((_, i) => (
-                  <tr key={`emp-${i}`}><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="3">합　　계</td>
-                  <td className="r">{totalSalary.toLocaleString()}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-            <div className="amount-box" style={{marginTop:'5mm'}}>
-              <div>노무비 합계 : 금 <strong>{totalSalary.toLocaleString()}</strong>원</div>
-              <div>한 글 금 액 : 금 <strong>{toKorean(totalSalary)}</strong></div>
-            </div>
-            <div className="sign-block">
-              <div>{year}년 {month}월 {peLastDay}일</div>
-              <div className="company">{settings.company_name}</div>
-              <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
+                </thead>
+                <tbody>
+                  {workers.map(w => (
+                    <tr key={w.id}>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>{monthPad}월</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center', fontWeight:'bold'}}>{w.name}</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'right', paddingRight:'8px'}}>{(parseInt(w.monthly_salary)||0).toLocaleString()}</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>
+                        {w.bank_account}{w.bank_name ? `(${w.bank_name})` : ''}
+                      </td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>{w.phone || ''}</td>
+                    </tr>
+                  ))}
+                  {Array.from({length: Math.max(0, 2 - workers.length)}).map((_, i) => (
+                    <tr key={`nc-${i}`}>
+                      <td style={{border:'0.5px solid #999', padding:'14px 4px'}}>&nbsp;</td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{flex:1, display:'flex', flexDirection:'column', padding:'6mm 8mm 4mm', borderTop:'0.5px solid #999'}}>
+                <div style={{textAlign:'center', fontSize:'11pt', marginBottom:'15mm'}}>
+                  {year}년 {monthPad}월　　일
+                </div>
+                <div style={{display:'flex', alignItems:'flex-start', fontSize:'10.5pt', lineHeight:'2.2', paddingLeft:'20mm'}}>
+                  <div style={{flex:'0 0 auto', fontWeight:'bold', paddingRight:'6mm'}}>계약상대자</div>
+                  <div>
+                    <div>{settings.company_name}</div>
+                    <div>{settings.company_addr}</div>
+                    <div>대표이사　{settings.ceo_name}　　(인)</div>
+                  </div>
+                </div>
+                <div style={{fontSize:'10.5pt', fontWeight:'bold', marginTop:'auto', paddingTop:'4mm'}}>
+                  (발주기관장) 귀하
+                </div>
+              </div>
             </div>
           </div>}
 
           {/* 시트 4: 노무비지급내역서 */}
           {showBillingSheet(4) && <span className="page-label">▌ 노무비지급내역서</span>}
-          {showBillingSheet(4) && <div className="page-doc">
-            <div className="doc-title" style={{letterSpacing:'6px'}}>노무비 지급 내역서</div>
-            <div style={{textAlign:'center',fontSize:'10pt',marginBottom:'8mm'}}>[ 서 식 3 ]</div>
-            <div style={{display:'flex',gap:'10mm',marginBottom:'5mm',fontSize:'9.5pt',flexWrap:'wrap'}}>
-              <span><strong>귀 사 명 :</strong> {settings.company_name || ''}</span>
-              <span><strong>지 급 월 :</strong> {year}년 {monthPad}월분</span>
-              <span><strong>지 급 일 :</strong> {year}년 {month}월 {salaryDay}일</span>
+          {showBillingSheet(4) && <div className="page-doc" style={{display:'flex', flexDirection:'column', color:'#000', pageBreakAfter:'auto', breakAfter:'auto'}}>
+            <div style={{fontSize:'9pt', fontWeight:'bold', marginBottom:'3mm'}}>【서식3】</div>
+            <div style={{textAlign:'center', fontSize:'18pt', fontWeight:'bold', letterSpacing:'6px', marginBottom:'5mm'}}>
+              용역근로자 노무비 지급 내역서
             </div>
-            <table className="doc-table">
-              <thead>
-                <tr>
-                  <th>연번</th>
-                  <th>성　명</th>
-                  <th>직위 / 직종</th>
-                  <th>지급금액 (원)</th>
-                  <th>은 행 명</th>
-                  <th>계 좌 번 호</th>
-                  <th>전화번호</th>
-                  <th>비 고</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workers.map((w, i) => (
-                  <tr key={w.id}>
-                    <td className="c">{i + 1}</td>
-                    <td className="c" style={{fontWeight:'bold'}}>{w.name}</td>
-                    <td className="c">{w.position}</td>
-                    <td className="r">{(parseInt(w.monthly_salary) || 0).toLocaleString()}</td>
-                    <td className="c">{w.bank_name || ''}</td>
-                    <td className="c">{w.bank_account || ''}</td>
-                    <td className="c">{w.phone || ''}</td>
-                    <td></td>
+            <div style={{fontSize:'10.5pt', marginBottom:'4mm'}}>
+              ○ 용역명 : {contractName}
+            </div>
+            <div style={{border:'0.5px solid #999', height:'120mm', display:'flex', flexDirection:'column'}}>
+              <table className="nc-table" style={{width:'100%', borderCollapse:'collapse', fontSize:'8pt', tableLayout:'fixed', color:'#000'}}>
+                <colgroup>
+                  <col style={{width:'12%'}} />
+                  <col style={{width:'9%'}} />
+                  <col style={{width:'9%'}} />
+                  <col style={{width:'13%'}} />
+                  <col style={{width:'11%'}} />
+                  <col style={{width:'16%'}} />
+                  <col style={{width:'15%'}} />
+                  <col style={{width:'10%'}} />
+                  <col style={{width:'8%'}} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', color:'#000', fontWeight:'normal', fontSize:'9.5pt'}}>계약상대자</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', color:'#000', fontWeight:'normal', fontSize:'9.5pt'}}>해당 월</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', color:'#000', fontWeight:'normal', fontSize:'9.5pt'}}>구분</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', color:'#000', fontWeight:'normal', fontSize:'9.5pt'}}>근로자 성명</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', color:'#000', fontWeight:'normal', fontSize:'9.5pt'}}>지급액</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', color:'#000', fontWeight:'normal', fontSize:'9.5pt'}}>계좌번호</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', color:'#000', fontWeight:'normal', fontSize:'9.5pt'}}>전화번호</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', color:'#000', fontWeight:'normal', fontSize:'9.5pt'}}>지급일자</th>
+                    <th style={{border:'0.5px solid #999', padding:'7px 4px', textAlign:'center', background:'#f5f5f5', color:'#000', fontWeight:'normal', fontSize:'9.5pt'}}>서명</th>
                   </tr>
-                ))}
-                {Array.from({length: Math.max(0, 5 - workers.length)}).map((_, i) => (
-                  <tr key={`emp-${i}`}><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="3">합　　계</td>
-                  <td className="r">{totalSalary.toLocaleString()}</td>
-                  <td colSpan="4"></td>
-                </tr>
-              </tfoot>
-            </table>
-            <div className="amount-box" style={{marginTop:'5mm'}}>
-              <div>지급합계 : 금 <strong>{totalSalary.toLocaleString()}</strong>원 ({toKorean(totalSalary)})</div>
+                </thead>
+                <tbody>
+                  {workers.map(w => (
+                    <tr key={w.id}>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>{settings.company_name || ''}</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>{monthPad}월</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>계좌입금</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>{w.name}</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'right', paddingRight:'8px'}}>{(parseInt(w.monthly_salary)||0).toLocaleString()}</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>{w.bank_account || ''}</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>{w.phone || ''}</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px', textAlign:'center'}}>{monthPad}.{String(salaryDay).padStart(2,'0')}</td>
+                      <td style={{border:'0.5px solid #999', padding:'9px 4px'}}></td>
+                    </tr>
+                  ))}
+                  {Array.from({length: Math.max(0, 2 - workers.length)}).map((_, i) => (
+                    <tr key={`np-${i}`}>
+                      <td style={{border:'0.5px solid #999', padding:'14px 4px'}}>&nbsp;</td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                      <td style={{border:'0.5px solid #999'}}></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{flex:1, display:'flex', flexDirection:'column', padding:'6mm 8mm 4mm', borderTop:'0.5px solid #999'}}>
+                <div style={{textAlign:'center', fontSize:'11pt', marginBottom:'15mm'}}>
+                  {year}년 {monthPad}월　　일
+                </div>
+                <div style={{display:'flex', alignItems:'flex-start', fontSize:'10.5pt', lineHeight:'2.2', paddingLeft:'20mm'}}>
+                  <div style={{flex:'0 0 auto', fontWeight:'bold', paddingRight:'6mm'}}>계약상대자</div>
+                  <div>
+                    <div>{settings.company_name}</div>
+                    <div>{settings.company_addr}</div>
+                    <div>대표이사　{settings.ceo_name}　　(인)</div>
+                  </div>
+                </div>
+                <div style={{fontSize:'10.5pt', fontWeight:'bold', marginTop:'auto', paddingTop:'4mm'}}>
+                  (발주기관장) 귀하
+                </div>
+              </div>
             </div>
-            <div className="sign-block">
-              <div>{year}년 {month}월 {salaryDay}일</div>
-              <div className="company">{settings.company_name}</div>
-              <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
+            <div style={{marginTop:'1mm', fontSize:'8.5pt', lineHeight:'1.9', color:'#000'}}>
+              ※ 1. 구분 : 계좌입금, 현금지급 구분<br/>
+              　 2. 현금지급은 근로자 서명 날인, 계좌입금은 서명 생략(은행 이체증명 등 증빙자료 첨부)<br/>
+              　 3. 보험료 공제 등 확인을 위한 임금대장 첨부
             </div>
           </div>}
         </>
@@ -826,26 +868,26 @@ export default function ReportPrintPage({
         <>
           {showSheet(4) && <span className="page-label">▌ 근무확인서</span>}
           {showSheet(4) && <div className="page" style={{paddingTop:'20mm'}}>
-            <h2 className="report-title">근 무 확 인 서</h2>
+            <h2 className="report-title">근 무 확 인 서 {monthPad}월(2구역)</h2>
             <div style={{textAlign:'right',fontSize:'9pt',marginBottom:'5mm'}}>
-              {monthPad}월 ({area}) &nbsp; 이행기간: {periodLabel}
+              이행기간: {periodLabel}
             </div>
             <table className="rt">
               <thead>
                 <tr>
-                  <th style={{padding:'20px 6px'}}>성 명</th>
-                  <th style={{padding:'20px 6px'}}>직 위</th>
-                  <th style={{padding:'20px 6px'}}>생년월일</th>
-                  <th style={{padding:'20px 6px'}}>비　고</th>
+                  <th style={{padding:'22px 6px',fontSize:'11pt'}}>성　 명</th>
+                  <th style={{padding:'22px 6px',fontSize:'11pt'}}>직　 위</th>
+                  <th style={{padding:'22px 6px',fontSize:'11pt'}}>생년월일</th>
+                  <th style={{padding:'22px 6px',fontSize:'11pt'}}>비　고</th>
                 </tr>
               </thead>
               <tbody>
                 {workers.map(w => (
                   <tr key={w.id}>
-                    <td style={{fontWeight:'bold',padding:'20px 6px'}}>{w.name}</td>
-                    <td style={{padding:'20px 6px'}}>{w.position}</td>
-                    <td style={{padding:'20px 6px'}}>{w.dob}</td>
-                    <td style={{padding:'20px 6px'}}></td>
+                    <td style={{padding:'20px 6px', fontSize:'11pt'}}>{w.name}</td>
+                    <td style={{padding:'20px 6px', fontSize:'11pt'}}>{w.position}</td>
+                    <td style={{padding:'20px 6px', fontSize:'11pt'}}>{w.dob}</td>
+                    <td style={{padding:'20px 6px', fontSize:'11pt'}}></td>
                   </tr>
                 ))}
                 {Array.from({length: Math.max(0, 4 - workers.length)}).map((_, i) => (
@@ -858,14 +900,6 @@ export default function ReportPrintPage({
                 ))}
               </tbody>
             </table>
-            <div style={{marginTop:'10mm',fontSize:'10.5pt',lineHeight:'2.2'}}>
-              위와 같이 근무하였음을 확인합니다.
-            </div>
-            <div className="sign-block">
-              <div>{year}년 {month}월 {peLastDay}일</div>
-              <div className="company">{settings.company_name}</div>
-              <div className="ceo">대표이사　{settings.ceo_name}　(인)</div>
-            </div>
           </div>}
         </>
       )}

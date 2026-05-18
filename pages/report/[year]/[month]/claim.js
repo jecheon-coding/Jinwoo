@@ -117,7 +117,7 @@ export default function ClaimPage({ year, month, contractId, startDay, settings,
 
   const css = `
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: '맑은 고딕','Malgun Gothic',sans-serif; font-size: 10pt; background: #6b7280; color: #000; }
+    body { font-family: '맑은 고딕','Malgun Gothic',sans-serif; font-size: 11pt; background: #6b7280; color: #000; }
     .top-bar { position: fixed; top: 0; left: 0; right: 0; height: 48px; background: #1f2937; display: flex; align-items: center; justify-content: space-between; padding: 0 80px; z-index: 100; gap: 12px; }
     .top-bar-left  { display: flex; gap: 6px; }
     .top-bar-center { display: flex; gap: 5px; flex: 1; justify-content: center; }
@@ -136,28 +136,28 @@ export default function ClaimPage({ year, month, contractId, startDay, settings,
     }
     .page {
       width: 210mm; height: 297mm;
-      padding: 20mm 25mm 15mm;
-      background: #fff; font-size: 10pt; line-height: 1.7;
+      padding: 30mm 20mm 20mm;
+      background: #fff; font-size: 11pt; line-height: 1.7;
       display: flex; flex-direction: column;
     }
-    .title    { text-align: center; font-size: 20pt; font-weight: bold; letter-spacing: 12px; margin-bottom: 0mm; }
-    .subtitle { text-align: center; font-size: 11pt; margin-bottom: 20mm; }
+    .title    { text-align: center; font-size: 24pt; font-weight: bold; letter-spacing: 12px; margin-bottom: 0mm; }
+    .subtitle { text-align: center; font-size: 14pt; margin-bottom: 20mm; }
     .items    { list-style: none; margin-bottom: 10mm; }
-    .items li { display: flex; margin-bottom: 5mm; font-size: 10.5pt; line-height: 1.7; }
-    .items li .lbl { flex: 0 0 auto; font-weight: bold; white-space: nowrap; padding-right: 2mm; }
-    .body-text { text-align: center; font-size: 10.5pt; margin: 0mm 0 10mm; letter-spacing: 1px; }
-    .sec-title { font-size: 10pt; font-weight: bold; margin-bottom: 4mm; }
-    .acct-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-bottom: 9mm; }
-    .acct-table th { border: 1px solid #000; padding: 9px 4px; text-align: center; background: #f0f0f0; font-weight: bold; color: #000; font-size: 9.5pt; }
+    .items li { display: flex; margin-bottom: 5mm; font-size: 12pt; line-height: 1.7; }
+    .items li .lbl { flex: 0 0 auto;  white-space: nowrap; padding-right: 2mm; }
+    .body-text { text-align: center; font-size: 12pt; margin: 0mm 0 10mm; letter-spacing: 1px; }
+    .sec-title { font-size: 11pt; font-weight: bold; margin-bottom: 4mm; }
+    .acct-table { width: 100%; border-collapse: collapse; font-size: 10.5pt; margin-bottom: 9mm; }
+    .acct-table th { border: 1px solid #000; padding: 9px 4px; text-align: center; background: #f0f0f0; font-weight: bold; color: #000; font-size: 10.5pt; }
     .acct-table td { border: 1px solid #000; padding: 10px 4px; text-align: center; color: #000; }
-    .date-line { text-align: center; font-size: 10.5pt; margin-bottom: 10mm; }
-    .requester { font-size: 10.5pt; line-height: 2; flex: 1; }
+    .date-line { text-align: center; font-size: 11.5pt; margin-bottom: 10mm; }
+    .requester { font-size: 12pt; line-height: 2; flex: 1; }
     .req-inner { display: flex; gap: 6mm; }
-    .req-label { font-weight: bold; white-space: nowrap; padding-top: 1px; }
+    .req-label {  white-space: nowrap; padding-top: 1px; }
     .req-rows  {}
     .req-row   { display: flex; margin-bottom: 3mm; }
-    .req-key   { display: inline-block; min-width: 14mm; font-weight: bold; }
-    .recipient { font-size: 12pt; font-weight: bold; margin-top: auto; padding-top: 8mm; }
+    .req-key   { display: inline-block; min-width: 14mm }
+    .recipient { font-size: 20pt; font-weight: bold; margin-top: auto; padding-top: 8mm; }
   `;
 
   return (
