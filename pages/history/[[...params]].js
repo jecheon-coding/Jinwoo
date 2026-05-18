@@ -129,18 +129,20 @@ export default function HistoryPage({ role, records, year, month, ps, pe, lastDa
         <span className="current">{year}년 {String(month).padStart(2,'0')}월</span>
         <Link href={`/history/${ny}/${nm}/${contractId}${sdQuery}`} className="btn btn-outline btn-sm">다음달 →</Link>
       </div>
-      <div style={{textAlign:'center',marginBottom:'12px'}}>
-        <span style={{fontSize:'13px',color:'#9ca3af',marginRight:'12px'}}>기간: {ps} ~ {pe}</span>
-        {contracts.length > 1 && contract && (
-          <span style={{marginRight:'12px',color:'#2563eb',fontWeight:'600',fontSize:'13px'}}>{contract.area || contract.name}</span>
-        )}
-        <span style={{display:'inline-flex',gap:'4px'}}>
-          <Link href={`/history/${year}/${month}/${contractId}?sd=1`}
-            className={`btn btn-sm ${startDay <= 1 ? 'btn-primary' : 'btn-outline'}`}>1일~말일</Link>
-          <Link href={`/history/${year}/${month}/${contractId}?sd=25`}
-            className={`btn btn-sm ${startDay > 1 ? 'btn-primary' : 'btn-outline'}`}>25일~말일</Link>
-        </span>
-      </div>
+      {role === 'admin' && (
+        <div style={{textAlign:'center',marginBottom:'12px'}}>
+          <span style={{fontSize:'13px',color:'#9ca3af',marginRight:'12px'}}>기간: {ps} ~ {pe}</span>
+          {contracts.length > 1 && contract && (
+            <span style={{marginRight:'12px',color:'#2563eb',fontWeight:'600',fontSize:'13px'}}>{contract.area || contract.name}</span>
+          )}
+          <span style={{display:'inline-flex',gap:'4px'}}>
+            <Link href={`/history/${year}/${month}/${contractId}?sd=1`}
+              className={`btn btn-sm ${startDay <= 1 ? 'btn-primary' : 'btn-outline'}`}>1일~말일</Link>
+            <Link href={`/history/${year}/${month}/${contractId}?sd=25`}
+              className={`btn btn-sm ${startDay > 1 ? 'btn-primary' : 'btn-outline'}`}>25일~말일</Link>
+          </span>
+        </div>
+      )}
 
       {/* 요약 — admin만 표시 */}
       {role === 'admin' && (
