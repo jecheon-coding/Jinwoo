@@ -29,8 +29,8 @@ export default function Layout({ children, role }) {
             </>}
             <button
               onClick={handleLogout}
-              style={{background:'none',border:'1px solid #cbd5e1',borderRadius:'6px',
-                      padding:'4px 10px',cursor:'pointer',fontSize:'13px',color:'#64748b'}}
+              style={{background:'none',border:'1px solid rgba(255,255,255,0.35)',borderRadius:'6px',
+                      padding:'6px 12px',cursor:'pointer',fontSize:'14px',color:'#bfdbfe'}}
             >
               로그아웃
             </button>
