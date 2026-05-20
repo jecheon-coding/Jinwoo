@@ -29,6 +29,12 @@ export async function getServerSideProps({ req, params, query }) {
     supabase.from('contracts').select('*').eq('active', true).order('sort_order').order('id'),
     supabase.from('settings').select('*'),
   ]);
+
+  if (contRes.error) {
+    console.error('[daily] contracts fetch error:', contRes.error);
+    return { props: { role, recordDate, contracts: [], settings: {}, mode: 'db-error' } };
+  }
+
   const contracts = contRes.data || [];
   const settings  = {};
   (setRes.data || []).forEach(r => { settings[r.key] = r.value; });
@@ -91,6 +97,24 @@ export async function getServerSideProps({ req, params, query }) {
 export default function DailyPage(props) {
   const { role, recordDate, contracts, settings, mode } = props;
   const router = useRouter();
+
+  // ── DB 오류 (첫 접속 cold start 등)
+  if (mode === 'db-error') {
+    return (
+      <>
+        <div className="page-header"><h1>일일 운행 입력</h1></div>
+        <div className="empty">
+          <p style={{color:'#dc2626'}}>데이터를 불러오지 못했습니다.</p>
+          <p style={{color:'#6b7280',fontSize:'13px',marginBottom:'16px'}}>
+            잠시 후 다시 시도해 주세요.
+          </p>
+          <button className="btn btn-primary" onClick={() => router.reload()}>
+            새로고침
+          </button>
+        </div>
+      </>
+    );
+  }
 
   // ── 계약 없음
   if (mode === 'no-contract') {
@@ -166,9 +190,9 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
     meal_cost:      record?.meal_cost      ?? '',
     other_cost:     record?.other_cost     ?? '',
     other_note:     record?.other_note     ?? '',
-    weight_1:       record?.weight_1       ?? '',
-    weight_2:       record?.weight_2       ?? '',
-    weight_3:       record?.weight_3       ?? '',
+    weight_1:       record?.weight_1 != null ? Math.round(parseFloat(record.weight_1) * 1000) : '',
+    weight_2:       record?.weight_2 != null ? Math.round(parseFloat(record.weight_2) * 1000) : '',
+    weight_3:       record?.weight_3 != null ? Math.round(parseFloat(record.weight_3) * 1000) : '',
     chip_3l:        record?.chip_3l        ?? 0,
     chip_5l:        record?.chip_5l        ?? 0,
     chip_20l:       record?.chip_20l       ?? 0,
@@ -182,7 +206,8 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
     return init;
   });
 
-  const totalW   = (parseFloat(form.weight_1)||0) + (parseFloat(form.weight_2)||0) + (parseFloat(form.weight_3)||0);
+  const totalWkg = (parseFloat(form.weight_1)||0) + (parseFloat(form.weight_2)||0) + (parseFloat(form.weight_3)||0);
+  const totalW   = totalWkg / 1000;
   const sub3     = (parseInt(form.chip_3l)  ||0) * 3;
   const sub5     = (parseInt(form.chip_5l)  ||0) * 5;
   const sub20    = (parseInt(form.chip_20l) ||0) * 20;
@@ -203,7 +228,7 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
     setSaving(true);
     const attendance = workers.map(w => ({ worker_id: w.id, value: att[w.id] ?? 0 }));
     const body = { ...form, attendance };
-    ['weight_1','weight_2','weight_3'].forEach(k => { body[k] = parseFloat(body[k]) || 0; });
+    ['weight_1','weight_2','weight_3'].forEach(k => { body[k] = (parseFloat(body[k]) || 0) / 1000; });
     ['chip_3l','chip_5l','chip_20l','chip_120l','trips'].forEach(k => { body[k] = parseInt(body[k]) || 0; });
     ['start_km','end_km','fuel','urea','fuel_cost','urea_cost','meal_cost','other_cost'].forEach(k => { body[k] = body[k] !== '' && body[k] != null ? parseFloat(body[k]) : null; });
 
@@ -241,9 +266,6 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
       <div className="page-header">
         <h1>일일 운행 입력</h1>
         <div className="btn-group">
-          {record && role === 'admin' && (
-            <button className="btn btn-danger btn-sm" onClick={handleDelete}>삭제</button>
-          )}
         </div>
       </div>
 
@@ -371,13 +393,13 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
 
         {/* 계근 */}
         <div className="card">
-          <h2>실중량 계근 (톤)</h2>
+          <h2>실중량 계근</h2>
           <div className="form-grid form-grid-4">
             {[['weight_1','1차'],['weight_2','2차'],['weight_3','3차']].map(([k,lbl]) => (
               <div className="form-group" key={k}>
-                <label>{lbl} (톤)</label>
-                <input type="number" step="0.001" value={form[k]}
-                  onChange={e => set(k, e.target.value)} placeholder="0.000" />
+                <label>{lbl} (kg)</label>
+                <input type="number" step="1" min="0" value={form[k]}
+                  onChange={e => set(k, e.target.value)} placeholder="0" />
               </div>
             ))}
             <div className="form-group">
@@ -406,7 +428,7 @@ function DailyForm({ role, recordDate, contracts, settings, contract, contractId
         </div>
 
         {/* 작업자 출근 */}
-        {workers.length > 0 && (
+        {role === 'admin' && workers.length > 0 && (
           <div className="card">
             <h2>작업자 출근 현황</h2>
             <div className="att-grid">

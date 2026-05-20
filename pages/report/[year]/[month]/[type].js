@@ -165,6 +165,8 @@ export default function ReportPrintPage({
   const showWork    = type === 'work'    || type === 'all';
   const showBilling = type === 'billing' || type === 'all';
 
+  const rowMm = dates.length >= 31 ? 7 : 7.5;
+
   const typeLabel = type === 'work' ? '근무현황 보고서' : type === 'billing' ? '기성/청구 서류' : '전체 보고서';
 
   const showSheet = (n) => type !== 'work' || !sheet || sheet === n;
@@ -264,6 +266,14 @@ export default function ReportPrintPage({
     table.rt tfoot td { background: #f0f0f0; font-weight: bold; border: 1px solid #666; padding: 5px 6px; }
     table.rt td.r { text-align: right; }
     table.rt td.l { text-align: left; }
+    table.rt-wt th { padding: 0 4px; font-size: 8.5pt; height: 8mm; line-height: 8mm; }
+    table.rt-wt tbody td { padding: 0 4px; font-size: 8.5pt; overflow: hidden; white-space: nowrap; }
+    table.rt-wt tfoot td { padding: 0 4px; font-size: 8.5pt; }
+    @media print { .page-wt { height: 297mm !important; overflow: hidden !important; } }
+    table.rt-chip th { padding: 0 2px; font-size: 7.5pt; height: 8mm; line-height: 8mm; }
+    table.rt-chip tbody td { padding: 0 2px; font-size: 7.5pt; overflow: hidden; white-space: nowrap; }
+    table.rt-chip tfoot td { padding: 0 2px; font-size: 7.5pt; }
+    @media print { .page-chip { height: 297mm !important; overflow: hidden !important; } }
     .att-table { font-size: 7.5pt; }
     .att-table th, .att-table td { padding: 20px 3px; text-align: center; }
     .sun { color: #dc2626 !important; }
@@ -323,7 +333,6 @@ export default function ReportPrintPage({
         </div>
         <div className="top-bar-center">
           {type === 'work' && (<>
-            <a href={sheetUrl(null)} className={`sheet-tab${!sheet ? ' active' : ''}`}>전체</a>
             <a href={sheetUrl(1)} className={`sheet-tab${sheet === 1 ? ' active' : ''}`}>계근현황</a>
             <a href={sheetUrl(2)} className={`sheet-tab${sheet === 2 ? ' active' : ''}`}>칩수거현황</a>
             <a href={sheetUrl(3)} className={`sheet-tab${sheet === 3 ? ' active' : ''}`}>일일근무현황</a>
@@ -331,7 +340,6 @@ export default function ReportPrintPage({
             <button className="bar-btn bar-btn-primary" onClick={() => window.print()}>🖨 인쇄</button>
           </>)}
           {type === 'billing' && (<>
-            <a href={billingSheetUrl(null)} className={`sheet-tab${!sheet ? ' active' : ''}`}>전체</a>
             <a href={claimUrl} className="sheet-tab">대금청구서</a>
             <a href={billingSheetUrl(1)} className={`sheet-tab${sheet === 1 ? ' active' : ''}`}>기성부분검사원</a>
             <a href={billingSheetUrl(2)} className={`sheet-tab${sheet === 2 ? ' active' : ''}`}>기성계</a>
@@ -351,10 +359,10 @@ export default function ReportPrintPage({
         <>
           {/* 시트 1: 계근현황 */}
           {showSheet(1) && <span className="page-label">▌ 계근현황</span>}
-          {showSheet(1) && <div className="page">
-            <h2 className="report-title">{monthPad}월 계근현황</h2>
-            <p style={{textAlign:'right',fontSize:'9pt',marginBottom:'4mm'}}>기간: {periodLabel}</p>
-            <table className="rt" style={{tableLayout:'fixed'}}>
+          {showSheet(1) && <div className="page page-wt" style={{padding:'10mm 20mm 6mm'}}>
+            <h2 className="report-title" style={{marginBottom:'5mm',paddingBottom:'2mm'}}>{monthPad}월 계근현황</h2>
+            <p style={{textAlign:'right',fontSize:'9pt',marginBottom:'2mm'}}>기간: {periodLabel}</p>
+            <table className="rt rt-wt" style={{tableLayout:'fixed'}}>
               <colgroup>
                 <col style={{width:'22%'}} />
                 <col style={{width:'19%'}} />
@@ -375,12 +383,12 @@ export default function ReportPrintPage({
                   const r = recMap[d];
                   const wt = (parseFloat(r?.weight_1)||0) + (parseFloat(r?.weight_2)||0) + (parseFloat(r?.weight_3)||0);
                   return (
-                    <tr key={d}>
+                    <tr key={d} style={{height:`${rowMm}mm`}}>
                       <td>{d.slice(5).replace('-', '월 ')}일</td>
                       <td>{r ? fmt(r.weight_1) : ''}</td>
                       <td>{r ? fmt(r.weight_2) : ''}</td>
                       <td>{r ? fmt(r.weight_3) : ''}</td>
-                      <td style={{fontWeight:'bold'}}>{wt.toFixed(3)}</td>
+                      <td style={{fontWeight:'bold'}}>{wt > 0 ? wt.toFixed(3) : ''}</td>
                     </tr>
                   );
                 })}
@@ -391,7 +399,7 @@ export default function ReportPrintPage({
                   const w2 = records.reduce((s,r) => s+(parseFloat(r.weight_2)||0), 0);
                   const w3 = records.reduce((s,r) => s+(parseFloat(r.weight_3)||0), 0);
                   return (
-                    <tr>
+                    <tr style={{height:`${rowMm}mm`}}>
                       <td>계</td>
                       <td>{w1 > 0 ? w1.toFixed(3) : ''}</td>
                       <td>{w2 > 0 ? w2.toFixed(3) : ''}</td>
@@ -406,10 +414,18 @@ export default function ReportPrintPage({
 
           {/* 시트 2: 칩수거현황 */}
           {showSheet(2) && <span className="page-label">▌ 칩수거현황</span>}
-          {showSheet(2) && <div className="page">
-            <h2 className="report-title">{monthPad}월 칩수거현황</h2>
-            <p style={{textAlign:'right',fontSize:'9pt',marginBottom:'4mm'}}>기간: {periodLabel}</p>
-            <table className="rt">
+          {showSheet(2) && <div className="page page-chip" style={{padding:'10mm 20mm 6mm'}}>
+            <h2 className="report-title" style={{marginBottom:'5mm',paddingBottom:'2mm'}}>{monthPad}월 칩수거현황</h2>
+            <p style={{textAlign:'right',fontSize:'9pt',marginBottom:'2mm'}}>기간: {periodLabel}</p>
+            <table className="rt rt-chip" style={{tableLayout:'fixed'}}>
+              <colgroup>
+                <col style={{width:'14%'}}/>
+                <col style={{width:'7%'}}/><col style={{width:'9%'}}/>
+                <col style={{width:'7%'}}/><col style={{width:'9%'}}/>
+                <col style={{width:'7%'}}/><col style={{width:'9%'}}/>
+                <col style={{width:'7%'}}/><col style={{width:'9%'}}/>
+                <col style={{width:'12%'}}/>
+              </colgroup>
               <thead>
                 <tr>
                   <th rowSpan="2">일 자</th>
@@ -430,7 +446,7 @@ export default function ReportPrintPage({
                 {dates.map(d => {
                   const r = recMap[d];
                   if (!r) return (
-                    <tr key={d}>
+                    <tr key={d} style={{height:`${rowMm}mm`}}>
                       <td>{d.slice(5).replace('-', '월 ')}일</td>
                       <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
@@ -438,7 +454,7 @@ export default function ReportPrintPage({
                   const s3 = (r.chip_3l||0)*3, s5 = (r.chip_5l||0)*5;
                   const s20 = (r.chip_20l||0)*20, s120 = (r.chip_120l||0)*120;
                   return (
-                    <tr key={d}>
+                    <tr key={d} style={{height:`${rowMm}mm`}}>
                       <td>{d.slice(5).replace('-', '월 ')}일</td>
                       <td>{r.chip_3l||0}</td>  <td>{s3.toLocaleString()}</td>
                       <td>{r.chip_5l||0}</td>  <td>{s5.toLocaleString()}</td>
@@ -450,7 +466,7 @@ export default function ReportPrintPage({
                 })}
               </tbody>
               <tfoot>
-                <tr>
+                <tr style={{height:`${rowMm}mm`}}>
                   <td>합 계</td>
                   <td>{total3l}</td>  <td>{(total3l*3).toLocaleString()}</td>
                   <td>{total5l}</td>  <td>{(total5l*5).toLocaleString()}</td>
@@ -539,9 +555,9 @@ export default function ReportPrintPage({
         <>
          {/* 시트 1: 기성부분검사원 */}
           {showBillingSheet(1) && <span className="page-label">▌ 기성부분검사원</span>}
-          {showBillingSheet(1) && <div className="page-doc" style={{padding:'10mm 12mm 10mm', display:'flex', flexDirection:'column'}}>{(() => {
+          {showBillingSheet(1) && <div className="page-doc" style={{padding:'15mm 12mm 15mm', display:'flex', flexDirection:'column'}}>{(() => {
               const fd = (d) => { if(!d) return ''; const p=d.split('-'); return p.length===3?`${p[0]}년 ${p[1]}월 ${p[2]}일`:d; };
-              const b  = {border:'1px solid #000', padding:'5px 8px'};
+              const b  = {border:'1px solid #000', padding:'8px 8px'};
               const lb = {...b, fontWeight:'bold', background:'#f5f5f5', textAlign:'center', whiteSpace:'nowrap'};
               return (<>
                 {/* 외곽 테두리 박스 */}
@@ -579,21 +595,21 @@ export default function ReportPrintPage({
                   {/* 테이블 2: 계약 내용 — colgroup으로 독립 너비 조정 가능 */}
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:'11pt',tableLayout:'fixed',marginTop:'-1px'}}>
                     <colgroup>
-                      <col style={{width:'20%'}} />
-                      <col style={{width:'30%'}} />
-                      <col style={{width:'16%'}} />
-                      <col style={{width:'34%'}} />
+                      <col style={{width:'19%'}} />
+                      <col style={{width:'26%'}} />
+                      <col style={{width:'14%'}} />
+                      <col style={{width:'36%'}} />
                     </colgroup>
                     <tbody>
                       <tr>
-                        <td style={{...lb, borderLeft:'none'}}>용 역 명</td>
-                        <td colSpan="3" style={{...b, borderRight:'none'}}>{contractName}</td>
+                        <td style={{...lb, borderLeft:'none', padding:'15px 8px'}}>용 역 명</td>
+                        <td colSpan="3" style={{...b, borderRight:'none', padding:'15px 8px'}}>{contractName}</td>
                       </tr>
                       <tr>
-                        <td style={{...lb, borderLeft:'none'}}>계 약 금 액</td>
-                        <td style={b}>톤당 : {unitPrice.toLocaleString()}원</td>
-                        <td style={lb}>기성부분<br/>준공금액</td>
-                        <td style={{...b, borderRight:'none'}}>일금 : {billingAmt.toLocaleString()}원<br/>(일금 {toKorean(billingAmt)} 원정)</td>
+                        <td style={{...lb, borderLeft:'none', padding:'19px 8px'}}>계 약 금 액</td>
+                        <td style={{...b, padding:'19px 8px'}}>톤당 : {unitPrice.toLocaleString()}원</td>
+                        <td style={{...lb, padding:'19px 8px'}}>기성부분<br/>준공금액</td>
+                        <td style={{...b, borderRight:'none', padding:'19px 8px'}}>일금 : {billingAmt.toLocaleString()}원<br/>(일금 {toKorean(billingAmt)} 원정)</td>
                       </tr>
                       <tr>
                         <td style={{...lb, borderLeft:'none'}}>계 약 일 자</td>
