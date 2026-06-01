@@ -61,7 +61,7 @@ function toKorean(n) {
   if (eok  > 0) result += group4(eok)  + '억';
   if (man  > 0) result += group4(man)  + '만';
   if (rest > 0) result += group4(rest);
-  return result + '원정';
+  return result;
 }
 
 export async function getServerSideProps({ req, params, query }) {
