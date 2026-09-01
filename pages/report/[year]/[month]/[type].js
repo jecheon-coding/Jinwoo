@@ -165,7 +165,9 @@ export default function ReportPrintPage({
   const showWork    = type === 'work'    || type === 'all';
   const showBilling = type === 'billing' || type === 'all';
 
-  const rowMm = dates.length >= 31 ? 7 : 7.5;
+  // 31일 기준(7mm)까지는 기존 고정값을 유지하고, 31일을 넘는 기간(예: 전월 23일~당월 말일 = 37~39일)은
+  // tbody+tfoot에 배정된 높이 예산(7mm × 32행)을 넘지 않도록 행 높이를 비례 축소해 한 페이지 안에 들어가게 한다.
+  const rowMm = dates.length <= 28 ? 7.5 : dates.length <= 31 ? 7 : (7 * 32) / (dates.length + 1);
 
   const typeLabel = type === 'work' ? '근무현황 보고서' : type === 'billing' ? '기성/청구 서류' : '전체 보고서';
 
@@ -567,8 +569,8 @@ export default function ReportPrintPage({
                     <colgroup>
                       <col style={{width:'5%'}} />
                       <col style={{width:'15%'}} />
-                      <col style={{width:'46%'}} />
-                      <col style={{width:'13%'}} />
+                      <col style={{width:'49%'}} />
+                      <col style={{width:'10%'}} />
                       <col style={{width:'21%'}} />
                     </colgroup>
                     <tbody>
